@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc/shared-types",
+    "declaration": true,
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

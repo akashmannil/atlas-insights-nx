@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build artifacts
+dist
+dist-ssr
+*.local
+.vite
+.nx/cache
+.nx/workspace-data
+tmp
+out-tsc
+
+# Coverage
+coverage
+.nyc_output
+
+# Editor / OS
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Env — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# Claude personal overrides — see ANATOMY in CLAUDE.md
+CLAUDE.local.md
+.claude/settings.local.json

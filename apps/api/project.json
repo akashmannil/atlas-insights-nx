@@ -1,0 +1,32 @@
+{
+  "name": "api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/api/src",
+  "projectType": "application",
+  "tags": ["scope:api", "type:app"],
+  "implicitDependencies": ["shared-types", "shared-utils"],
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm run start:dev", "cwd": "apps/api" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm run build", "cwd": "apps/api" },
+      "outputs": ["{projectRoot}/dist"],
+      "dependsOn": ["^build"]
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm run start:prod", "cwd": "apps/api" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm run lint", "cwd": "apps/api" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm run typecheck", "cwd": "apps/api" }
+    }
+  }
+}
