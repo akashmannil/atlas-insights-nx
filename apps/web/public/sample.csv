@@ -1,0 +1,21 @@
+time,latitude,longitude,depth,mag,magType,place,type,sig,felt,tsunami,id
+2024-01-15T08:23:41.000Z,61.3456,-149.8765,22.5,3.2,ml,"14 km NW of Anchorage, Alaska",earthquake,160,12,0,ak2024001001
+2024-01-15T07:15:22.000Z,37.7749,-122.4194,8.2,2.8,md,"3 km W of San Francisco, California",earthquake,120,45,0,nc2024001002
+2024-01-15T06:44:18.000Z,35.6762,139.6503,45.0,5.8,mw,"20 km SW of Tokyo, Japan",earthquake,623,156,1,us2024001003
+2024-01-15T05:30:55.000Z,-33.4569,-70.6483,12.0,4.5,ml,"8 km E of Santiago, Chile",earthquake,312,8,0,us2024001004
+2024-01-15T04:12:33.000Z,-37.7870,176.5830,18.0,3.9,ml,"25 km SW of Rotorua, New Zealand",earthquake,215,22,0,nz2024001005
+2024-01-15T03:45:11.000Z,-3.0675,119.8120,12.0,6.2,mw,"45 km NE of Makassar, Indonesia",earthquake,810,0,1,us2024001006
+2024-01-15T02:33:08.000Z,38.3688,38.3213,10.0,5.4,mw,"30 km S of Elazig, Turkey",earthquake,540,890,0,us2024001007
+2024-01-15T01:22:45.000Z,37.9838,23.7275,8.5,3.7,ml,"12 km E of Athens, Greece",earthquake,185,35,0,hl2024001008
+2024-01-15T00:11:32.000Z,19.4326,-99.1332,30.0,4.8,mw,"10 km SE of Mexico City, Mexico",earthquake,415,280,0,us2024001009
+2024-01-14T23:08:19.000Z,14.5995,120.9842,25.0,5.1,mw,"35 km W of Manila, Philippines",earthquake,478,55,0,us2024001010
+2024-01-14T22:55:07.000Z,-9.1900,-75.0152,150.0,6.8,mw,"120 km E of Lima, Peru",earthquake,1150,12,0,us2024001011
+2024-01-14T21:40:53.000Z,59.8872,-153.3214,85.0,4.1,ml,"80 km SW of Kenai, Alaska",earthquake,228,2,0,ak2024001012
+2024-01-14T20:28:41.000Z,34.0195,-118.4912,6.0,2.5,ml,"5 km N of Los Angeles, California",earthquake,95,210,0,ci2024001013
+2024-01-14T19:15:29.000Z,38.2048,142.3612,35.0,7.1,mw,"Offshore Miyagi Prefecture, Japan",earthquake,1350,450,1,us2024001014
+2024-01-14T18:02:17.000Z,-21.1789,-175.1982,15.0,5.9,mw,"Tonga Islands",earthquake,715,0,0,us2024001015
+2024-01-14T16:49:05.000Z,-17.7335,168.3124,20.0,5.5,mw,"Vanuatu Islands",earthquake,581,0,0,us2024001016
+2024-01-14T15:36:43.000Z,-8.4975,157.0432,30.0,5.3,mw,"Solomon Islands",earthquake,521,0,0,us2024001017
+2024-01-14T14:23:31.000Z,-5.8564,146.9921,65.0,5.7,mw,"60 km SE of Lae, Papua New Guinea",earthquake,648,0,0,us2024001018
+2024-01-14T13:10:19.000Z,32.4279,50.8785,12.0,4.6,ml,"35 km N of Isfahan, Iran",earthquake,345,180,0,ir2024001019
+2024-01-14T11:57:07.000Z,42.3601,13.3890,8.0,3.4,ml,"Central Italy",earthquake,174,65,0,iv2024001020
