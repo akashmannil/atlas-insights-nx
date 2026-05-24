@@ -9,6 +9,7 @@ import { SelectedEarthquakeProvider } from '@/context/SelectedEarthquakeContext'
 import { useEarthquakes } from '@/hooks/useEarthquakes';
 import { useFilteredEarthquakes } from '@/hooks/useFilteredEarthquakes';
 import { useEarthquakeStats } from '@/hooks/useEarthquakeStats';
+import { useLoadSampleData } from '@/hooks/useLoadSampleData';
 
 /**
  * Top-level dashboard composition.
@@ -39,6 +40,8 @@ export const DashboardPage = () => {
     dataUpdatedAt,
   } = useEarthquakes();
 
+  const { loadSample, clearSample, isLoading: isSampleLoading, isSampleMode } = useLoadSampleData();
+
   const filtered = useFilteredEarthquakes(records);
   // Server-side stats reflect the **full** dataset; filtered count is shown
   // separately in the filter bar. Fallback records keep tiles populated
@@ -55,6 +58,10 @@ export const DashboardPage = () => {
           isFetching={isFetching}
           cachedByApi={cachedByApi}
           onRefresh={() => refetch()}
+          isSampleMode={isSampleMode}
+          isSampleLoading={isSampleLoading}
+          onLoadSample={loadSample}
+          onClearSample={clearSample}
         />
 
         <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 px-6 py-6">
