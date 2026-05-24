@@ -39,6 +39,7 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             react: ['react', 'react-dom'],
             charts: ['recharts'],
+            map: ['leaflet', 'react-leaflet'],
             query: ['@tanstack/react-query', '@tanstack/react-table'],
           },
         },

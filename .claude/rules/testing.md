@@ -18,13 +18,13 @@ If you're adding tests, this is the order and tooling per app/lib.
 
 2. **Pure derivations** — `apps/web/src/hooks/useEarthquakeStats.ts`, `EarthquakesService.applyFilters`.
 
-3. **Zustand store actions** — toggle selection, reset filters, swap axes.
+3. **Zustand store actions** — toggle selection, reset filters, swap axes, switch `activeView`.
 
 4. **API service** — `EarthquakesService` with stubbed `Cache` + mocked `undici`. Cover: cache hit, cache miss, in-flight de-dup, upstream failure → 503.
 
 5. **API controller validation** — `supertest` against the boot app: malformed query → 400, unknown query key → 400, valid query → 200 with the expected envelope.
 
-6. **FE components** — render with fixture data, assert callback invocation. Don't test Recharts internals; test our handlers.
+6. **FE components** — render with fixture data, assert callback invocation. Don't test Recharts or Leaflet internals; test our handlers (chart `onPointClick`, map marker `eventHandlers.click`, `<ViewSelector>` toggle calling `setActiveView`).
 
 7. **One integration test** — render `<DashboardPage>` with `msw` returning a fixture envelope; click a row, assert chart highlight overlay appears.
 
@@ -33,6 +33,7 @@ If you're adding tests, this is the order and tooling per app/lib.
 ## What NOT to test
 
 - Recharts internals.
+- Leaflet / react-leaflet internals (tile loading, pan/zoom animation, projection math).
 - TanStack Table / Virtual internals.
 - NestJS / Express internals.
 - Tailwind class strings.

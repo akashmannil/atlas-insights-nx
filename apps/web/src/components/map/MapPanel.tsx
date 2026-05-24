@@ -2,28 +2,22 @@ import { useCallback } from 'react';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { ViewSelector } from '@/components/map/ViewSelector';
 import { useEarthquakeStore } from '@/store/useEarthquakeStore';
 import type { EarthquakeRecord } from '@atlas/shared-types';
-import { AxisSelector } from './AxisSelector';
-import { EarthquakeChart } from './EarthquakeChart';
+import { EarthquakeMap } from './EarthquakeMap';
+import { ViewSelector } from './ViewSelector';
 
-interface ChartPanelProps {
+interface MapPanelProps {
   records: readonly EarthquakeRecord[];
   loading: boolean;
 }
 
 /**
- * Container that owns chart-related slice of the global store and passes
- * primitives down to <EarthquakeChart /> via props. This boundary is where
- * Zustand subscriptions are concentrated so the inner chart can stay
- * `memo`-friendly.
+ * Container that owns the map-related slice of the global store and forwards
+ * primitives to <EarthquakeMap />. Matches the ChartPanel boundary so
+ * Zustand subscriptions stay concentrated and the leaf is memo-friendly.
  */
-export const ChartPanel = ({ records, loading }: ChartPanelProps) => {
-  const xAxis = useEarthquakeStore((s) => s.xAxis);
-  const yAxis = useEarthquakeStore((s) => s.yAxis);
-  const setXAxis = useEarthquakeStore((s) => s.setXAxis);
-  const setYAxis = useEarthquakeStore((s) => s.setYAxis);
+export const MapPanel = ({ records, loading }: MapPanelProps) => {
   const activeView = useEarthquakeStore((s) => s.activeView);
   const setActiveView = useEarthquakeStore((s) => s.setActiveView);
   const selectedId = useEarthquakeStore((s) => s.selectedId);
@@ -31,8 +25,6 @@ export const ChartPanel = ({ records, loading }: ChartPanelProps) => {
   const setSelectedId = useEarthquakeStore((s) => s.setSelectedId);
   const setHoveredId = useEarthquakeStore((s) => s.setHoveredId);
 
-  // Stable callbacks — the chart is memoized and we don't want a new function
-  // identity on every parent render to bust that.
   const handlePointClick = useCallback(
     (id: string) => setSelectedId(id === selectedId ? null : id),
     [selectedId, setSelectedId],
@@ -44,24 +36,14 @@ export const ChartPanel = ({ records, loading }: ChartPanelProps) => {
 
   return (
     <Card
-      title="Scatter chart"
-      description="Each marker is an event. Pick variables for X and Y, click to lock-select, hover to peek."
-      actions={
-        <div className="flex flex-wrap items-end gap-3">
-          <AxisSelector
-            xAxis={xAxis}
-            yAxis={yAxis}
-            onXChange={setXAxis}
-            onYChange={setYAxis}
-          />
-          <ViewSelector value={activeView} onChange={setActiveView} />
-        </div>
-      }
+      title="World map"
+      description="Each marker is an event positioned by latitude/longitude. Click to lock-select, hover to peek."
+      actions={<ViewSelector value={activeView} onChange={setActiveView} />}
       className="min-h-[700px]"
       flush
     >
       <div className="relative flex-1 min-h-0">
-        <div className="absolute inset-2">
+        <div className="absolute inset-2 overflow-hidden rounded-xl">
           {loading ? (
             <Skeleton className="h-full w-full" />
           ) : records.length === 0 ? (
@@ -70,10 +52,8 @@ export const ChartPanel = ({ records, loading }: ChartPanelProps) => {
               message="Try lowering the minimum magnitude or clearing the search field."
             />
           ) : (
-            <EarthquakeChart
+            <EarthquakeMap
               records={records}
-              xAxis={xAxis}
-              yAxis={yAxis}
               selectedId={selectedId}
               hoveredId={hoveredId}
               onPointClick={handlePointClick}

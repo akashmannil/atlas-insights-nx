@@ -19,6 +19,9 @@ If the report is too vague to reproduce, ask one specific clarifying question.
 | Symptom                              | Start here                                                            |
 | ------------------------------------ | --------------------------------------------------------------------- |
 | Chart render bug                     | `apps/web/src/components/chart/EarthquakeChart.tsx`                   |
+| Map render / tile bug                | `apps/web/src/components/map/EarthquakeMap.tsx` + `apps/web/src/main.tsx` (Leaflet CSS import) |
+| Map ↔ chart ↔ table sync bug         | `apps/web/src/store/useEarthquakeStore.ts` (`selectedId` / `hoveredId` / `activeView`) |
+| View toggle stuck or doesn't switch  | `apps/web/src/components/map/ViewSelector.tsx` + `pages/DashboardPage.tsx` |
 | Table render bug                     | `apps/web/src/components/table/EarthquakeTable.tsx`                   |
 | Chart ↔ table sync bug               | `apps/web/src/store/useEarthquakeStore.ts` + `context/SelectedEarthquakeContext.tsx` |
 | Filter bug                           | `apps/web/src/hooks/useFilteredEarthquakes.ts`                        |

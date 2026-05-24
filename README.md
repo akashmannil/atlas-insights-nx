@@ -10,7 +10,7 @@
 
 - **Nx monorepo** with two apps (`web`, `api`) and two shared libs (`shared-types`, `shared-utils`) — strict project boundaries, end-to-end TypeScript paths, single dependency graph.
 - **NestJS API layer** in front of the public USGS feed: in-memory cache with TTL and stampede prevention, `@nestjs/throttler` rate limiting, `helmet` security headers, `class-validator` DTOs, untrusted-input sanitization, sanitized error envelope, structured access logs.
-- **React dashboard** with bidirectional chart ↔ table sync, three deliberately-placed state patterns (props / Context / Zustand), virtualized table (TanStack Virtual), Recharts scatter, polished Tailwind UI.
+- **React dashboard** with bidirectional chart ↔ table sync, a toggleable scatter / world-map view (Recharts + Leaflet), three deliberately-placed state patterns (props / Context / Zustand), virtualized table (TanStack Virtual), polished Tailwind UI.
 - **Single source of truth for the wire format** — `EarthquakeRecord` lives in `libs/shared-types` and is imported by both ends.
 - **CSV parser shared across the wire** — the API parses upstream, the FE can fall back to direct USGS fetch in "demo mode" without diverging from the API's interpretation.
 - Production-grade developer experience: TypeScript strict mode (with `noUncheckedIndexedAccess`), ESLint zero-warning policy, Prettier, env validation, graceful shutdown.
@@ -50,7 +50,8 @@ GET /api/earthquakes (helmet, throttle, validate, sanitize-on-ingest)
    ↓ fetch (apps/web/src/api/earthquakes.ts)
    ↓ TanStack Query
    ↓ useFilteredEarthquakes (Zustand filter slice)
-       ├→ ChartPanel  →  EarthquakeChart
+       ├→ ChartPanel  →  EarthquakeChart    (activeView === 'chart')
+       ├→ MapPanel    →  EarthquakeMap      (activeView === 'map')
        └→ TablePanel  →  EarthquakeTable
             ↑ Selection / hover loops back via Zustand + Context
 ```
@@ -163,6 +164,7 @@ The FE drives this from `useInfiniteQuery`: the first page (500 records) lands i
 | `@tanstack/react-table`                  | Headless table model                                   |
 | `@tanstack/react-virtual`                | Row windowing for the 10k-row table                    |
 | `recharts`                               | Scatter chart                                          |
+| `leaflet`, `react-leaflet`               | World-map view + OpenStreetMap tile rendering          |
 | `zustand`                                | Global UI state                                        |
 | `papaparse`                              | CSV parsing for the direct-feed fallback               |
 | `tailwindcss`, `postcss`, `autoprefixer` | Styling                                                |
@@ -189,11 +191,11 @@ The FE drives this from `useInfiniteQuery`: the first page (500 records) lands i
 
 ## 🧠 State management approach (recap)
 
-| Pattern         | Where                                                                       | Why                                                                                 |
-| --------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| **Props**       | `<EarthquakeChart>`, `<EarthquakeTable>`, `<AxisSelector>`, `<StatsBar>`    | Pure presentational components stay snapshot- and Storybook-friendly                |
-| **React Context** | `SelectedEarthquakeContext`                                                | Resolves `selectedId` → `EarthquakeRecord` once, shares across distant subtrees     |
-| **Zustand**     | `useEarthquakeStore` — filters, axes, `selectedId`, `hoveredId`             | High-frequency cross-cutting UI state; selector subscriptions avoid re-render storms |
+| Pattern           | Where                                                                          | Why                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| **Props**         | `<EarthquakeChart>`, `<EarthquakeMap>`, `<EarthquakeTable>`, `<AxisSelector>`  | Pure presentational components stay snapshot- and Storybook-friendly                 |
+| **React Context** | `SelectedEarthquakeContext`                                                    | Resolves `selectedId` → `EarthquakeRecord` once, shares across distant subtrees      |
+| **Zustand**       | `useEarthquakeStore` — filters, axes, `activeView`, `selectedId`, `hoveredId`  | High-frequency cross-cutting UI state; selector subscriptions avoid re-render storms |
 
 The canonical `selectedId` lives in Zustand; the Context derives the resolved record from `(records, selectedId)`. Two sources, single source of truth — see [`INTERVIEWER.md`](./INTERVIEWER.md) for the rationale.
 
@@ -211,7 +213,7 @@ The canonical `selectedId` lives in Zustand; the Context derives the resolved re
 
 ## 🔭 Future improvements
 
-- Geographic map view (Leaflet / MapLibre).
+- Marker clustering on the map at low zoom levels (`react-leaflet-cluster`) — pays off once the visible dataset crosses ~2k markers.
 - Time-series panel — hourly / daily event bins.
 - Redis cache backend for multi-replica API.
 - OpenAPI / Swagger doc surface on the API.

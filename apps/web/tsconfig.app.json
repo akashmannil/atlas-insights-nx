@@ -6,6 +6,7 @@
     "allowImportingTsExtensions": true,
     "moduleDetection": "force",
     "types": ["vite/client"],
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@atlas/shared-types": ["../../libs/shared-types/src/index.ts"],
