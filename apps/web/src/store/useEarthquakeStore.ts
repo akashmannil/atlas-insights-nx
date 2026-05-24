@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { NumericField } from '@atlas/shared-types';
 
+/** Which primary visualisation is shown in the left panel. */
+export type ActiveView = 'chart' | 'map';
+
 /**
  * Global UI state — *not* the dataset itself.
  *
@@ -25,6 +28,9 @@ export interface EarthquakeUiState {
   /** Hover-highlighted earthquake — transient, never persisted. */
   hoveredId: string | null;
 
+  /** Active primary view — scatter chart or world map. */
+  activeView: ActiveView;
+
   /** Chart axis selections. */
   xAxis: NumericField;
   yAxis: NumericField;
@@ -41,6 +47,7 @@ export interface EarthquakeUiState {
 
   setSelectedId: (id: string | null) => void;
   setHoveredId: (id: string | null) => void;
+  setActiveView: (view: ActiveView) => void;
   setXAxis: (field: NumericField) => void;
   setYAxis: (field: NumericField) => void;
   setMinMagnitude: (value: number) => void;
@@ -57,7 +64,7 @@ const INITIAL_FILTERS = {
   tsunamiOnly: false,
 } as const;
 
-const DEFAULT_PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 10;
 
 export const useEarthquakeStore = create<EarthquakeUiState>()(
   // `subscribeWithSelector` lets us imperatively subscribe to slices outside
@@ -65,6 +72,8 @@ export const useEarthquakeStore = create<EarthquakeUiState>()(
   subscribeWithSelector((set) => ({
     selectedId: null,
     hoveredId: null,
+
+    activeView: 'chart',
 
     xAxis: 'longitude',
     yAxis: 'latitude',
@@ -76,6 +85,7 @@ export const useEarthquakeStore = create<EarthquakeUiState>()(
 
     setSelectedId: (id) => set({ selectedId: id }),
     setHoveredId: (id) => set({ hoveredId: id }),
+    setActiveView: (view) => set({ activeView: view }),
     setXAxis: (field) => set({ xAxis: field }),
     setYAxis: (field) => set({ yAxis: field }),
     // Filter setters also reset the page — otherwise the user could be left
@@ -96,3 +106,4 @@ export const useEarthquakeStore = create<EarthquakeUiState>()(
  */
 export const selectSelectedId = (s: EarthquakeUiState): string | null => s.selectedId;
 export const selectHoveredId = (s: EarthquakeUiState): string | null => s.hoveredId;
+export const selectActiveView = (s: EarthquakeUiState): ActiveView => s.activeView;

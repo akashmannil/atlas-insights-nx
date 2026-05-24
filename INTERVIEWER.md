@@ -35,6 +35,7 @@ If you only have 15 minutes, **read `apps/web/src` and skim `apps/api/src/earthq
 | Fetch geographic data from a public source                                   | NestJS service fetches USGS CSV (`undici` + timeout), parses, caches, exposes JSON envelope to FE             | `apps/api/src/earthquakes/earthquakes.service.ts`, `apps/web/src/api/earthquakes.ts`, `apps/web/src/hooks/useEarthquakes.ts`     |
 | Two-panel responsive layout (chart left, table right)                        | CSS grid; collapses to a single column under the `xl` breakpoint                                              | `apps/web/src/pages/DashboardPage.tsx`                                                                                            |
 | Chart panel — scatter plot with X / Y axis pickers                           | Recharts `<ScatterChart>` with custom shape; `<Select>` dropdowns                                             | `apps/web/src/components/chart/EarthquakeChart.tsx`, `apps/web/src/components/chart/AxisSelector.tsx`                            |
+| Geographic view (additive)                                                   | react-leaflet world map with OpenStreetMap tiles; segmented Chart/Map selector toggles `activeView` in store  | `apps/web/src/components/map/EarthquakeMap.tsx`, `apps/web/src/components/map/MapPanel.tsx`, `apps/web/src/components/map/ViewSelector.tsx` |
 | Data panel — scrollable table with all rows                                  | Virtualized TanStack Table (handles full 10k+ payload)                                                        | `apps/web/src/components/table/EarthquakeTable.tsx`, `apps/web/src/components/table/columns.tsx`                                 |
 | Loading + empty + error states                                               | Skeleton, EmptyState, ErrorState components, plus a top-level `ErrorBoundary`                                 | `apps/web/src/components/ui/*`                                                                                                    |
 | **Table → Chart** sync                                                       | Hover writes `hoveredId` to Zustand; chart subscribes, renders a highlight overlay                            | `apps/web/src/components/table/TablePanel.tsx`, `apps/web/src/components/chart/EarthquakeChart.tsx`                              |
@@ -108,6 +109,19 @@ Portfolio context: if a recruiter loads this on GitHub Pages with no backend dep
 
 Same rule as the FE-only version: `React.memo` only on components that (a) receive stable props and (b) are expensive to render. Wrapping every component in `memo` is a known anti-pattern.
 
+### 2.8 Why a toggleable Chart / Map view instead of a third panel
+
+The dashboard already has a left + right two-column grid (visualisation + table). Adding the geographic view as a *third* panel would compress both visualisations into halves of the left column, hurting legibility at every breakpoint. A segmented selector that switches the left panel between Chart and Map keeps the layout intact and gives each view the full width of the visualisation column.
+
+`activeView: 'chart' | 'map'` lives in the same Zustand store as the rest of the UI state — same selector-subscription discipline, no new state layer. Both the chart and map panels host the same `<ViewSelector>` component in their card header so the toggle is always co-located with the view it controls.
+
+### 2.9 Why react-leaflet (and not Mapbox / MapLibre / deck.gl)
+
+- **No API key, no paid tier.** OpenStreetMap tiles via the standard CDN are free for non-abusive usage. Mapbox would have required a key and a billing relationship.
+- **Smallest dependency footprint that does the job.** Leaflet (~40 KB gz) + react-leaflet (~10 KB gz). MapLibre GL would have brought ~200 KB of WebGL machinery for a use case that doesn't need it.
+- **`CircleMarker` instead of `Marker`.** Default Leaflet markers ship with bundler-unfriendly image paths. SVG circle markers also let us reuse the existing magnitude → colour ramp from the scatter chart, so the two views speak the same visual language.
+- **Native two-way selection.** The map subscribes to the same `selectedId` / `hoveredId` in Zustand that the chart and table already use; selecting from any of the three highlights everywhere.
+
 ### 2.8 What I explicitly did NOT add
 
 - **A database.** Pointless for a public read-only feed.
@@ -158,19 +172,21 @@ Tooling: **Vitest** (jsdom for FE, node for API), **@testing-library/react**, **
 3. Open <http://localhost:5173>. Dashboard populates within ~1 s on a normal connection.
 4. **Hover a chart point** → matching table row highlights and scrolls into view.
 5. **Click a row** → chart marker grows a focus ring, selection banner appears.
-6. Type a city name → both chart and table shrink in lockstep.
-7. Drag the magnitude slider → stats tiles + chart + table all update.
-8. Click **Export CSV** → file with the currently visible rows downloads.
-9. Hit <http://localhost:3000/api/earthquakes/stats> directly to see the API in action.
-10. Curl with garbage query: `curl 'http://localhost:3000/api/earthquakes?bogus=1'` → 400, demonstrating `forbidNonWhitelisted`.
-11. Open DevTools → Network: only the `/api/*` requests go out (no leak to USGS from the client when in API mode).
-12. Open these files for the architecture story:
+6. **Toggle the Chart / Map selector** in the visualisation panel header → map renders the same filtered set; clicking a marker selects the same record everywhere; selection auto-pans the map.
+7. Type a city name → both chart and table shrink in lockstep.
+8. Drag the magnitude slider → stats tiles + chart + table all update.
+9. Click **Export CSV** → file with the currently visible rows downloads.
+10. Hit <http://localhost:3000/api/earthquakes/stats> directly to see the API in action.
+11. Curl with garbage query: `curl 'http://localhost:3000/api/earthquakes?bogus=1'` → 400, demonstrating `forbidNonWhitelisted`.
+12. Open DevTools → Network: only the `/api/*` requests go out (no leak to USGS from the client when in API mode).
+13. Open these files for the architecture story:
     - `apps/web/src/store/useEarthquakeStore.ts` — FE state boundaries.
     - `apps/web/src/context/SelectedEarthquakeContext.tsx` — Context derivation pattern.
+    - `apps/web/src/components/map/MapPanel.tsx` — Map panel + selection sync.
     - `apps/api/src/main.ts` + `app.module.ts` — API security wiring.
     - `apps/api/src/earthquakes/earthquakes.service.ts` — caching + stampede prevention.
     - `libs/shared-types/src/index.ts` — the wire contract.
-13. `npm run lint && npm run typecheck` — both should pass clean.
+14. `npm run lint && npm run typecheck` — both should pass clean.
 
 ---
 
@@ -210,7 +226,8 @@ This replaces an earlier infinite-streaming model that, while elegant, made ever
 
 - The USGS feed occasionally returns HTTP 5xx under load. The API insulates the FE from this — first failure surfaces as a 503 to the client; React Query retries.
 - Filtering is in-memory on both ends and not URL-synced. Refresh clears state.
-- The chart is purely cartesian. A geographic projection is a natural next step but out of scope.
+- The map renders one `CircleMarker` per visible record. Past ~5k visible markers the interaction starts to chug; the next step is `react-leaflet-cluster` at low zoom levels.
+- Map tiles are fetched from the public OpenStreetMap CDN. Production deployments should either self-host tiles or proxy through a tile provider with a known SLA.
 - API cache is in-memory and per-process. Multi-replica deploy would point `@nestjs/cache-manager` at Redis.
 - Server-side filters (`minMagnitude`, `search`, `tsunamiOnly`) exist on the API but aren't used by the FE today — filtering still happens client-side on accumulated pages. Pushing filters to the server is the obvious next step for datasets that grow beyond ~50k rows.
 

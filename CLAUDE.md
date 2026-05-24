@@ -37,9 +37,10 @@ If you are an AI assistant reading this: **the architecture is intentional**. Be
 
 - **React 18 + Vite 5** — no class components except `ErrorBoundary`.
 - **Tailwind CSS** — no CSS Modules, no styled-components.
-- **Zustand** (UI state) + **React Context** (resolved selection) + **TanStack Query** (server state) + props (presentational).
+- **Zustand** (UI state — filters, axes, selection, hover, active view) + **React Context** (resolved selection) + **TanStack Query** (server state) + props (presentational).
 - **TanStack Table + Virtual** for the data table.
 - **Recharts** for the scatter chart.
+- **react-leaflet + Leaflet** for the world map view (OpenStreetMap tiles).
 - **PapaParse** for the CSV fallback path.
 
 ### `apps/api`
@@ -189,7 +190,7 @@ cd apps/api && npm run start:dev
 - `hooks/` — React hooks: data, derivations, store wrappers.
 - `store/` — Zustand stores. One per domain.
 - `context/` — React Contexts + their accessor hooks.
-- `components/<feature>/` — feature-scoped components.
+- `components/<feature>/` — feature-scoped components (`chart/`, `map/`, `table/`, `filters/`, `stats/`, `selection/`, `layout/`).
 - `components/ui/` — headless primitives. **No business logic.**
 - `utils/` — pure functions only.
 - `pages/` — top-level composition. Thin, declarative.

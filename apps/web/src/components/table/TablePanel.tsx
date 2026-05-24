@@ -131,7 +131,7 @@ export const TablePanel = ({
     <Card
       title="Event records"
       description="Click a row to lock-select it. Hover to highlight in the chart."
-      className="min-h-[520px]"
+      className="min-h-[700px]"
       flush
     >
       {loading ? (

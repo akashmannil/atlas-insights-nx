@@ -8,6 +8,7 @@ Atlas Insights is a public-data dashboard with no authenticated user surface, bu
 
 | Asset                               | Threat                                                                  | Control                                                                                                       |
 | ----------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| FE third-party fetches              | Tile-CDN outage or compromise affecting the map view                    | Map tiles loaded over HTTPS from `tile.openstreetmap.org` only; failure degrades the map but not the dashboard (chart + table stay fully functional) |
 | API availability                    | DoS via cache-busting query parameters, brute force, scraping           | `@nestjs/throttler` per-IP rate limit, in-flight upstream de-duplication, hard upstream timeout, body size cap |
 | API integrity                       | Mass-assignment, malformed query bypass                                 | Global `ValidationPipe({whitelist, forbidNonWhitelisted})`, strict DTO with `class-validator`                  |
 | Cross-origin abuse                  | Browser CSRF / cross-origin data theft                                  | CORS allowlist from env (never `*`), no credentials, `GET`-only methods                                       |
@@ -28,6 +29,7 @@ Atlas Insights is a public-data dashboard with no authenticated user surface, bu
 - **`@typescript-eslint/no-explicit-any: 'error'`** — `any` is a build break, not a warning.
 - **Defensive CSV parsing** in `libs/shared-utils/src/csv.ts`: hand-picked fields, manual numeric coercion (`null`, not `NaN`), bounded field lengths.
 - **No third-party analytics, no third-party fonts loaded at runtime** (Google Fonts is preconnected but optional).
+- **Map tiles loaded over HTTPS from OpenStreetMap only.** The map view (`apps/web/src/components/map/EarthquakeMap.tsx`) fetches raster tiles from `https://{a,b,c}.tile.openstreetmap.org/...`. No tile-side cookies, no third-party JS execution — only image responses. A tile-server outage degrades the map silently; the chart and table remain fully functional, and the user can toggle back via the Chart / Map selector.
 - **No service worker / no localStorage of sensitive data** — there is none.
 
 ---

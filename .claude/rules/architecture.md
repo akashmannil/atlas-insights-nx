@@ -34,22 +34,29 @@ GET /api/earthquakes  (helmet, throttle, validate)
    ↓ fetch (apps/web/src/api/earthquakes.ts)
    ↓ TanStack Query (apps/web/src/hooks/useEarthquakes.ts)
    ↓ useFilteredEarthquakes (consumes Zustand filter slice)
-       ├→ ChartPanel → EarthquakeChart
+       ├→ ChartPanel → EarthquakeChart       (when activeView === 'chart')
+       ├→ MapPanel   → EarthquakeMap         (when activeView === 'map')
        └→ TablePanel → EarthquakeTable
 
 Selection / hover loops back via:
-   - Zustand (selectedId, hoveredId — canonical)
+   - Zustand (selectedId, hoveredId, activeView — canonical)
    - SelectedEarthquakeContext (resolved record — derived)
+
+The ViewSelector segmented control (chart/map) is hosted in the primary
+panel header. Each panel reads `activeView` from Zustand independently;
+DashboardPage decides which container to render, but the selector itself
+lives next to the panel's own actions so the toggle is co-located with
+the visualisation it controls.
 ```
 
 ## State layers (FE)
 
-| Layer    | What it holds                              | When to use                                              |
-| -------- | ------------------------------------------ | -------------------------------------------------------- |
-| Props    | Pure data + callbacks                      | Parent → presentational child                            |
-| Context  | Resolved selection record + setter         | Distant subtrees need the same derived value             |
-| Zustand  | Filters, axis pickers, selected/hovered id | High-frequency UI state, anything cross-cutting          |
-| Query    | Server data (the earthquake records)       | Anything that came from a network call                   |
+| Layer    | What it holds                                          | When to use                                              |
+| -------- | ------------------------------------------------------ | -------------------------------------------------------- |
+| Props    | Pure data + callbacks                                  | Parent → presentational child                            |
+| Context  | Resolved selection record + setter                     | Distant subtrees need the same derived value             |
+| Zustand  | Filters, axis pickers, active view, selected/hovered id| High-frequency UI state, anything cross-cutting          |
+| Query    | Server data (the earthquake records)                   | Anything that came from a network call                   |
 
 ## Component layers (FE)
 

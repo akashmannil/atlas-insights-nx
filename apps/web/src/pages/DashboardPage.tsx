@@ -1,5 +1,6 @@
 import { AppHeader } from '@/components/layout/AppHeader';
 import { ChartPanel } from '@/components/chart/ChartPanel';
+import { MapPanel } from '@/components/map/MapPanel';
 import { TablePanel } from '@/components/table/TablePanel';
 import { FilterBar } from '@/components/filters/FilterBar';
 import { StatsBar } from '@/components/stats/StatsBar';
@@ -10,6 +11,7 @@ import { useEarthquakes } from '@/hooks/useEarthquakes';
 import { useFilteredEarthquakes } from '@/hooks/useFilteredEarthquakes';
 import { useEarthquakeStats } from '@/hooks/useEarthquakeStats';
 import { useLoadSampleData } from '@/hooks/useLoadSampleData';
+import { useEarthquakeStore } from '@/store/useEarthquakeStore';
 
 /**
  * Top-level dashboard composition.
@@ -41,6 +43,8 @@ export const DashboardPage = () => {
   } = useEarthquakes();
 
   const { loadSample, clearSample, isLoading: isSampleLoading, isSampleMode } = useLoadSampleData();
+
+  const activeView = useEarthquakeStore((s) => s.activeView);
 
   const filtered = useFilteredEarthquakes(records);
   // Server-side stats reflect the **full** dataset; filtered count is shown
@@ -79,7 +83,11 @@ export const DashboardPage = () => {
 
               <div className="grid flex-1 grid-cols-1 gap-4 xl:grid-cols-5">
                 <div className="xl:col-span-3">
-                  <ChartPanel records={filtered} loading={isLoading} />
+                  {activeView === 'map' ? (
+                    <MapPanel records={filtered} loading={isLoading} />
+                  ) : (
+                    <ChartPanel records={filtered} loading={isLoading} />
+                  )}
                 </div>
                 <div className="xl:col-span-2">
                   <TablePanel
