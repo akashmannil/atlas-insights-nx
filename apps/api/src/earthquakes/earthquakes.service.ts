@@ -24,7 +24,7 @@ import type { EarthquakesQueryDto } from './dto/earthquakes-query.dto';
  *      and almost never re-fetches.
  *
  *   2. **ETag** — a stable hash of the dataset version + the request's
- *      filter/page params. The controller compares this to `If-None-Match`
+ *      pagination params. The controller compares this to `If-None-Match`
  *      and short-circuits with 304 when the client's copy is current. This
  *      means *zero JSON body bytes* go over the wire on a re-load until the
  *      cache TTL expires upstream.
@@ -55,8 +55,7 @@ export class EarthquakesService {
 
   async list(query: EarthquakesQueryDto): Promise<EarthquakeListResponse> {
     const { records, cached } = await this.getRecords();
-    const filtered = this.applyFilters(records, query);
-    const total = filtered.length;
+    const total = records.length;
 
     // Two pagination modes:
     //   - `cursor` set → strict pagination: slice(cursor, cursor+limit).
@@ -65,7 +64,7 @@ export class EarthquakesService {
     const cursor = query.cursor ?? 0;
     const pageSize = query.limit ?? (query.cursor !== undefined ? DEFAULT_PAGE_SIZE : total);
 
-    const sliced = filtered.slice(cursor, cursor + pageSize);
+    const sliced = records.slice(cursor, cursor + pageSize);
     const nextOffset = cursor + sliced.length;
     const nextCursor = nextOffset < total ? nextOffset : null;
 
@@ -87,7 +86,7 @@ export class EarthquakesService {
    *
    * Inputs:
    *   - `datasetVersion` — bumps on each upstream fetch, guarantees freshness.
-   *   - Query params that actually affect the response body.
+   *   - Pagination params that actually affect the response body.
    *
    * Output is a quoted weak ETag so HTTP proxies treat it correctly even if
    * gzip changes byte-for-byte equality.
@@ -95,11 +94,8 @@ export class EarthquakesService {
   computeListEtag(query: EarthquakesQueryDto): string {
     const key = JSON.stringify({
       v: this.datasetVersion,
-      minMag: query.minMagnitude ?? null,
       limit: query.limit ?? null,
       cursor: query.cursor ?? null,
-      search: query.search ?? null,
-      tsu: query.tsunamiOnly ?? null,
     });
     const hash = createHash('sha1').update(key).digest('base64url').slice(0, 16);
     return `W/"eq-${hash}"`;
@@ -178,25 +174,5 @@ export class EarthquakesService {
       `Cached ${records.length} earthquake records (ttl ${ttlSeconds}s, version ${this.datasetVersion})`,
     );
     return records;
-  }
-
-  private applyFilters(
-    records: readonly EarthquakeRecord[],
-    query: EarthquakesQueryDto,
-  ): readonly EarthquakeRecord[] {
-    if (!query.minMagnitude && !query.search && !query.tsunamiOnly) {
-      return records;
-    }
-
-    const needle = query.search?.toLowerCase();
-    const minMag = query.minMagnitude ?? 0;
-    const tsunamiOnly = query.tsunamiOnly === true;
-
-    return records.filter((r) => {
-      if (tsunamiOnly && r.tsunami !== 1) return false;
-      if (minMag > 0 && (r.magnitude ?? -Infinity) < minMag) return false;
-      if (needle && !r.place.toLowerCase().includes(needle)) return false;
-      return true;
-    });
   }
 }
