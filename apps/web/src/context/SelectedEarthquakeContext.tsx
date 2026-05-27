@@ -1,3 +1,8 @@
+// Why: project convention co-locates the Context, Provider, and accessor
+// hook in a single file (see .claude/rules/code-style.md). That trips
+// react-refresh/only-export-components, which insists a file export only
+// components. Disabling here is preferable to splitting the file.
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import type { EarthquakeRecord } from '@atlas/shared-types';
 import { useEarthquakeStore } from '@/store/useEarthquakeStore';

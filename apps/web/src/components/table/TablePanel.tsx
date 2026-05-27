@@ -12,8 +12,6 @@ interface TablePanelProps {
   /** All filtered records loaded into the FE so far (across all paginated fetches). */
   records: readonly EarthquakeRecord[];
   loading: boolean;
-  /** Total records available on the server (pre-FE-filter). */
-  total: number;
   /** True while a background page fetch is in flight. */
   isFetchingNextPage: boolean;
   /** True when every server page has been loaded. */
@@ -42,7 +40,6 @@ interface TablePanelProps {
 export const TablePanel = ({
   records,
   loading,
-  total,
   isFetchingNextPage,
   isComplete,
   onLoadMore,

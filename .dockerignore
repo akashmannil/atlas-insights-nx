@@ -1,0 +1,38 @@
+# Keep build context small.
+
+**/node_modules
+**/dist
+**/.vite
+**/coverage
+**/.nx/cache
+**/.nx/workspace-data
+**/tmp
+**/out-tsc
+
+# VCS / editor / OS
+.git
+.gitignore
+.github
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Local env — never bake into images
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Docs / project metadata not needed at runtime
+*.md
+docs
+
+# Claude personal config
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Logs
+*.log

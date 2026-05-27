@@ -1,6 +1,8 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 
-interface CardProps extends HTMLAttributes<HTMLDivElement> {
+// `title` on HTMLAttributes is the native string tooltip; we widen it to
+// ReactNode here for the card header, so omit the conflicting native type.
+interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;

@@ -122,14 +122,28 @@ The dashboard already has a left + right two-column grid (visualisation + table)
 - **`CircleMarker` instead of `Marker`.** Default Leaflet markers ship with bundler-unfriendly image paths. SVG circle markers also let us reuse the existing magnitude → colour ramp from the scatter chart, so the two views speak the same visual language.
 - **Native two-way selection.** The map subscribes to the same `selectedId` / `hoveredId` in Zustand that the chart and table already use; selecting from any of the three highlights everywhere.
 
-### 2.8 What I explicitly did NOT add
+### 2.9 Why a Docker stack + CI pipeline (and the shape of each)
+
+Originally I left these out to keep the review surface small. They're added now because:
+
+- A **multi-stage Dockerfile per app** plus a **combined `docker compose`** gives reviewers a single-command parity-with-prod run that doesn't depend on the host's Node version.
+- nginx fronting the SPA and reverse-proxying `/api` is the same shape a real deploy would take — `VITE_API_BASE_URL=/api` is baked into the bundle at build time, so there's no CORS hop and no runtime config injection.
+- The **api container is not host-exposed**; only nginx is. The API is reachable solely from the docker network, which mirrors the typical "private service behind a public edge" topology.
+- The API container runs as **non-root under `tini`** so signal handling + zombie-reaping is correct; Nest's `enableShutdownHooks()` actually fires on `SIGTERM`.
+- The build context is locked down via [`.dockerignore`](./.dockerignore) — `node_modules`, `dist`, env files, `.git`, and Claude-local files never enter the image.
+
+CI is intentionally minimal: a `verify` job (lint → typecheck → build with npm-cache reuse) followed by a `docker` job that builds both images via Buildx with a GHA layer cache. Images aren't pushed — the job is a smoke test that the Dockerfiles still produce a runnable artifact. Concurrency is grouped per-ref so a new push cancels superseded runs.
+
+See [`.github/workflows/ci.yml`](./.github/workflows/ci.yml), [`apps/api/Dockerfile`](./apps/api/Dockerfile), [`apps/web/Dockerfile`](./apps/web/Dockerfile), [`apps/web/nginx.conf`](./apps/web/nginx.conf), [`docker-compose.yml`](./docker-compose.yml).
+
+### 2.10 What I explicitly did NOT add
 
 - **A database.** Pointless for a public read-only feed.
 - **Authentication.** No user surface to protect.
 - **OpenAPI / Swagger.** Worth ~30 minutes of work; happy to add as a follow-up. Not in scope for the assessment.
 - **A test suite.** See §4 for the plan.
-- **Docker / docker-compose.** Two `npm run dev` processes are simpler to review than a container stack.
 - **A WAF / CDN-level DDoS layer.** That's the deployment platform's job; the API's rate limiter handles application-layer abuse. See [`SECURITY.md`](./SECURITY.md) §4 for the explicit out-of-scope list.
+- **Pushing CI images to a registry.** The current CI only builds-and-discards. Adding GHCR push on tag is a follow-on once a release process exists.
 
 ---
 
@@ -167,7 +181,7 @@ Tooling: **Vitest** (jsdom for FE, node for API), **@testing-library/react**, **
 
 ## 5. How to evaluate this submission in 15 minutes
 
-1. `npm install` from the workspace root — installs both apps + libs in one pass.
+1. `npm install` from the workspace root — installs both apps + libs in one pass. (Or skip this and the next step: `docker compose up --build` boots the whole stack on `http://localhost:8080` with no Node toolchain on the host.)
 2. `npm run dev` — boots API (`:3000`) and web (`:5173`) in parallel.
 3. Open <http://localhost:5173>. Dashboard populates within ~1 s on a normal connection.
 4. **Hover a chart point** → matching table row highlights and scrolls into view.
