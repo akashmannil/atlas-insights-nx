@@ -1,7 +1,8 @@
-import type {
-  EarthquakeListResponse,
-  EarthquakeRecord,
-  EarthquakeStatsResponse,
+import {
+  DEFAULT_PAGE_SIZE,
+  type EarthquakeListResponse,
+  type EarthquakeRecord,
+  type EarthquakeStatsResponse,
 } from '@atlas/shared-types';
 import { computeEarthquakeStats, parseEarthquakeCsv } from '@atlas/shared-utils';
 
@@ -24,9 +25,6 @@ const DIRECT_FEED_URL =
   import.meta.env.VITE_USGS_FEED_URL ??
   'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.csv';
 
-/** Page size used for cursor pagination. */
-export const PAGE_SIZE = 500;
-
 export const EARTHQUAKES_QUERY_KEY = ['earthquakes', 'pages'] as const;
 export const EARTHQUAKES_STATS_KEY = ['earthquakes', 'stats'] as const;
 
@@ -47,7 +45,7 @@ const fetchApiPage = async (
   cursor: number,
   signal?: AbortSignal,
 ): Promise<EarthquakeListResponse> => {
-  const url = `${API_BASE}/earthquakes?cursor=${cursor}&limit=${PAGE_SIZE}`;
+  const url = `${API_BASE}/earthquakes?cursor=${cursor}&limit=${DEFAULT_PAGE_SIZE}`;
   const response = await fetch(url, {
     signal,
     headers: { Accept: 'application/json' },
@@ -104,7 +102,7 @@ const fetchDirectPage = async (
   signal?: AbortSignal,
 ): Promise<EarthquakeListResponse> => {
   const all = await getDirectDataset(signal);
-  const slice = all.slice(cursor, cursor + PAGE_SIZE);
+  const slice = all.slice(cursor, cursor + DEFAULT_PAGE_SIZE);
   const nextOffset = cursor + slice.length;
   return {
     data: slice,

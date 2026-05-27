@@ -58,6 +58,12 @@ export interface AxisOption {
   readonly unit?: string;
 }
 
+/**
+ * Page size used by both the FE pagination caller and the API's default slice.
+ * Single source of truth so the two ends never disagree.
+ */
+export const DEFAULT_PAGE_SIZE = 500;
+
 export const AXIS_OPTIONS: readonly AxisOption[] = [
   { value: 'magnitude', label: 'Magnitude' },
   { value: 'depth', label: 'Depth', unit: 'km' },

@@ -5,10 +5,11 @@ import type { Cache } from 'cache-manager';
 import { createHash } from 'node:crypto';
 import { request } from 'undici';
 import { computeEarthquakeStats, parseEarthquakeCsv } from '@atlas/shared-utils';
-import type {
-  EarthquakeListResponse,
-  EarthquakeRecord,
-  EarthquakeStatsResponse,
+import {
+  DEFAULT_PAGE_SIZE,
+  type EarthquakeListResponse,
+  type EarthquakeRecord,
+  type EarthquakeStatsResponse,
 } from '@atlas/shared-types';
 import type { EarthquakesQueryDto } from './dto/earthquakes-query.dto';
 
@@ -37,8 +38,6 @@ export class EarthquakesService {
 
   private static readonly CACHE_KEY = 'earthquakes:all-month';
   private static readonly FETCH_TIMEOUT_MS = 15_000;
-  /** Default page size when `limit` is omitted but `cursor` is set. */
-  private static readonly DEFAULT_PAGE_SIZE = 500;
 
   private inflight: Promise<EarthquakeRecord[]> | null = null;
   private lastFetchAt: number | null = null;
@@ -64,9 +63,7 @@ export class EarthquakesService {
     //   - `cursor` omitted → legacy "limit-from-top" semantics so older
     //     clients keep working unchanged.
     const cursor = query.cursor ?? 0;
-    const pageSize = query.limit ?? (query.cursor !== undefined
-      ? EarthquakesService.DEFAULT_PAGE_SIZE
-      : total);
+    const pageSize = query.limit ?? (query.cursor !== undefined ? DEFAULT_PAGE_SIZE : total);
 
     const sliced = filtered.slice(cursor, cursor + pageSize);
     const nextOffset = cursor + sliced.length;
