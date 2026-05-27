@@ -42,7 +42,14 @@ export const DashboardPage = () => {
     dataUpdatedAt,
   } = useEarthquakes();
 
-  const { loadSample, clearSample, isLoading: isSampleLoading, isSampleMode } = useLoadSampleData();
+  const {
+    loadSample,
+    clearSample,
+    isLoading: isSampleLoading,
+    isSampleMode,
+    error: sampleError,
+    dismissError: dismissSampleError,
+  } = useLoadSampleData();
 
   const activeView = useEarthquakeStore((s) => s.activeView);
 
@@ -78,6 +85,23 @@ export const DashboardPage = () => {
           ) : (
             <>
               <StatsBar stats={stats} loading={statsLoading} />
+              {sampleError && (
+                <div
+                  role="alert"
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                >
+                  <span>
+                    <strong className="font-semibold">Sample data:</strong> {sampleError}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={dismissSampleError}
+                    className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-800 transition hover:bg-red-100"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
               <SelectionBanner />
               <FilterBar visibleRecords={filtered} totalCount={total || records.length} />
 

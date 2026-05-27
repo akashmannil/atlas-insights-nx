@@ -14,9 +14,11 @@ export const useLoadSampleData = () => {
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [isSampleMode, setIsSampleMode] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadSample = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const resp = await fetch('/sample.csv');
       if (!resp.ok) throw new Error(`Could not fetch sample CSV (${resp.status})`);
@@ -42,7 +44,9 @@ export const useLoadSampleData = () => {
 
       setIsSampleMode(true);
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load sample data.';
       console.error('[sample] failed to load fixture data:', err);
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -52,7 +56,10 @@ export const useLoadSampleData = () => {
     queryClient.invalidateQueries({ queryKey: EARTHQUAKES_QUERY_KEY });
     queryClient.invalidateQueries({ queryKey: EARTHQUAKES_STATS_KEY });
     setIsSampleMode(false);
+    setError(null);
   }, [queryClient]);
 
-  return { loadSample, clearSample, isLoading, isSampleMode };
+  const dismissError = useCallback(() => setError(null), []);
+
+  return { loadSample, clearSample, isLoading, isSampleMode, error, dismissError };
 };
