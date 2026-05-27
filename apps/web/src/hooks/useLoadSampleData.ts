@@ -1,11 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
-import { parseEarthquakeCsv } from '@atlas/shared-utils';
+import { computeEarthquakeStats, parseEarthquakeCsv } from '@atlas/shared-utils';
 import type { EarthquakeListResponse, EarthquakeStatsResponse } from '@atlas/shared-types';
 import { EARTHQUAKES_QUERY_KEY, EARTHQUAKES_STATS_KEY } from '@/api/earthquakes';
-
-const SIGNIFICANT_THRESHOLD = 600;
 
 /**
  * Loads the bundled sample CSV into the TanStack Query cache, replacing live
@@ -36,27 +34,8 @@ export const useLoadSampleData = () => {
         { pages: [page], pageParams: [0] },
       );
 
-      let magSum = 0;
-      let magCount = 0;
-      let maxMag: number | null = null;
-      let tsunamiCount = 0;
-      let significantCount = 0;
-      for (const r of records) {
-        if (r.magnitude !== null) {
-          magSum += r.magnitude;
-          magCount += 1;
-          if (maxMag === null || r.magnitude > maxMag) maxMag = r.magnitude;
-        }
-        if (r.tsunami === 1) tsunamiCount += 1;
-        if ((r.significance ?? 0) >= SIGNIFICANT_THRESHOLD) significantCount += 1;
-      }
-
       const stats: EarthquakeStatsResponse = {
-        count: records.length,
-        averageMagnitude: magCount > 0 ? magSum / magCount : null,
-        maxMagnitude: maxMag,
-        tsunamiCount,
-        significantCount,
+        ...computeEarthquakeStats(records),
         generatedAt: now,
       };
       queryClient.setQueryData<EarthquakeStatsResponse>(EARTHQUAKES_STATS_KEY, stats);

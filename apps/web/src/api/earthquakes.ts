@@ -3,7 +3,7 @@ import type {
   EarthquakeRecord,
   EarthquakeStatsResponse,
 } from '@atlas/shared-types';
-import { parseEarthquakeCsv } from '@atlas/shared-utils';
+import { computeEarthquakeStats, parseEarthquakeCsv } from '@atlas/shared-utils';
 
 /**
  * Network entry points for earthquake data.
@@ -123,27 +123,8 @@ const fetchDirectStats = async (
   signal?: AbortSignal,
 ): Promise<EarthquakeStatsResponse> => {
   const records = await getDirectDataset(signal);
-  let magSum = 0;
-  let magCount = 0;
-  let maxMag: number | null = null;
-  let tsunamiCount = 0;
-  let significantCount = 0;
-  const SIGNIFICANT_THRESHOLD = 600;
-  for (const r of records) {
-    if (r.magnitude !== null) {
-      magSum += r.magnitude;
-      magCount += 1;
-      if (maxMag === null || r.magnitude > maxMag) maxMag = r.magnitude;
-    }
-    if (r.tsunami === 1) tsunamiCount += 1;
-    if ((r.significance ?? 0) >= SIGNIFICANT_THRESHOLD) significantCount += 1;
-  }
   return {
-    count: records.length,
-    averageMagnitude: magCount > 0 ? magSum / magCount : null,
-    maxMagnitude: maxMag,
-    tsunamiCount,
-    significantCount,
+    ...computeEarthquakeStats(records),
     generatedAt: Date.now(),
   };
 };

@@ -1,18 +1,12 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { EarthquakeRecord, EarthquakeStatsResponse } from '@atlas/shared-types';
+import { computeEarthquakeStats, type EarthquakeStatsProjection } from '@atlas/shared-utils';
 import { EARTHQUAKES_STATS_KEY, fetchEarthquakeStats } from '@/api/earthquakes';
 
 const STALE_MS = Number(import.meta.env.VITE_QUERY_STALE_MS ?? 5 * 60 * 1000);
-const SIGNIFICANT_THRESHOLD = 600;
 
-export interface EarthquakeStats {
-  count: number;
-  averageMagnitude: number | null;
-  maxMagnitude: number | null;
-  tsunamiCount: number;
-  significantCount: number;
-}
+export type EarthquakeStats = EarthquakeStatsProjection;
 
 const empty: EarthquakeStats = {
   count: 0,
@@ -64,28 +58,7 @@ export const useEarthquakeStats = (
       };
     }
     if (fallbackRecords.length === 0) return empty;
-
-    let magSum = 0;
-    let magCount = 0;
-    let maxMag: number | null = null;
-    let tsunamiCount = 0;
-    let significantCount = 0;
-    for (const r of fallbackRecords) {
-      if (r.magnitude !== null) {
-        magSum += r.magnitude;
-        magCount += 1;
-        if (maxMag === null || r.magnitude > maxMag) maxMag = r.magnitude;
-      }
-      if (r.tsunami === 1) tsunamiCount += 1;
-      if ((r.significance ?? 0) >= SIGNIFICANT_THRESHOLD) significantCount += 1;
-    }
-    return {
-      count: fallbackRecords.length,
-      averageMagnitude: magCount > 0 ? magSum / magCount : null,
-      maxMagnitude: maxMag,
-      tsunamiCount,
-      significantCount,
-    };
+    return computeEarthquakeStats(fallbackRecords);
   }, [query.data, fallbackRecords]);
 
   return { stats, isLoading: query.isLoading && fallbackRecords.length === 0 };
