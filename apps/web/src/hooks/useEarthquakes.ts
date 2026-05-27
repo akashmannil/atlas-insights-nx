@@ -59,7 +59,12 @@ export const useEarthquakes = (): UseEarthquakesResult => {
     retry: 2,
   });
 
-  const { hasNextPage, isFetchingNextPage, fetchNextPage: rawFetchNextPage } = query;
+  const {
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage: rawFetchNextPage,
+    refetch: rawRefetch,
+  } = query;
 
   // No idle auto-prefetch — pages load only when the user navigates to them
   // via the table's pagination controls. This keeps cold-load bandwidth
@@ -75,8 +80,8 @@ export const useEarthquakes = (): UseEarthquakesResult => {
   }, [hasNextPage, isFetchingNextPage, rawFetchNextPage]);
 
   const refetch = useCallback(() => {
-    query.refetch();
-  }, [query]);
+    rawRefetch();
+  }, [rawRefetch]);
 
   const records = useMemo<EarthquakeRecord[]>(() => {
     if (!query.data) return [];
