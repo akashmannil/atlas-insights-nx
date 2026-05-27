@@ -77,24 +77,36 @@ const fetchApiStats = async (signal?: AbortSignal): Promise<EarthquakeStatsRespo
 // ---------- Direct mode (FE-only, no API deployed) ----------
 
 let directCache: { fetchedAt: number; records: EarthquakeRecord[] } | null = null;
+let directInflight: Promise<EarthquakeRecord[]> | null = null;
 const DIRECT_TTL_MS = 5 * 60 * 1000;
 
 const getDirectDataset = async (signal?: AbortSignal): Promise<EarthquakeRecord[]> => {
   if (directCache && Date.now() - directCache.fetchedAt < DIRECT_TTL_MS) {
     return directCache.records;
   }
-  const response = await fetch(DIRECT_FEED_URL, {
-    signal,
-    headers: { Accept: 'text/csv' },
+  // Coalesce concurrent callers (e.g. infinite-query firing pages while stats
+  // resolves) onto a single upstream request — matches the API service's
+  // stampede protection.
+  if (directInflight) return directInflight;
+
+  directInflight = (async () => {
+    const response = await fetch(DIRECT_FEED_URL, {
+      signal,
+      headers: { Accept: 'text/csv' },
+    });
+    if (!response.ok) {
+      throw new Error(`USGS feed responded with ${response.status} ${response.statusText}.`);
+    }
+    const csv = await response.text();
+    if (!csv.trim()) throw new Error('USGS feed returned an empty response.');
+    const records = parseEarthquakeCsv(csv);
+    directCache = { fetchedAt: Date.now(), records };
+    return records;
+  })().finally(() => {
+    directInflight = null;
   });
-  if (!response.ok) {
-    throw new Error(`USGS feed responded with ${response.status} ${response.statusText}.`);
-  }
-  const csv = await response.text();
-  if (!csv.trim()) throw new Error('USGS feed returned an empty response.');
-  const records = parseEarthquakeCsv(csv);
-  directCache = { fetchedAt: Date.now(), records };
-  return records;
+
+  return directInflight;
 };
 
 const fetchDirectPage = async (
