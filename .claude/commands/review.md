@@ -63,13 +63,13 @@ If the change touches the API: suggest a `curl` against the endpoint with both a
 ## 7. Report
 
 ```text
-🟢 Good
+Good
 - <bullet>
 
-🟡 Questionable
+Questionable
 - <file:line> — <issue> — <suggested fix>
 
-🔴 Blocking
+Blocking
 - <file:line> — <issue> — <required fix>
 
 Recommendation: APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION
