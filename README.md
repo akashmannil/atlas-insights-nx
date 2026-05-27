@@ -13,6 +13,7 @@
 - **React dashboard** with bidirectional chart ↔ table sync, a toggleable scatter / world-map view (Recharts + Leaflet), three deliberately-placed state patterns (props / Context / Zustand), virtualized table (TanStack Virtual), polished Tailwind UI.
 - **Single source of truth for the wire format** — `EarthquakeRecord` lives in `libs/shared-types` and is imported by both ends.
 - **CSV parser shared across the wire** — the API parses upstream, the FE can fall back to direct USGS fetch in "demo mode" without diverging from the API's interpretation.
+- **Container + CI pipeline** — multi-stage Dockerfiles for both apps, combined `docker compose` stack with nginx fronting the SPA and reverse-proxying `/api`, GitHub Actions running lint / typecheck / build + image builds on every push.
 - Production-grade developer experience: TypeScript strict mode (with `noUncheckedIndexedAccess`), ESLint zero-warning policy, Prettier, env validation, graceful shutdown.
 
 See [`SECURITY.md`](./SECURITY.md) for the full threat model and the controls actually in place.
@@ -25,11 +26,17 @@ See [`SECURITY.md`](./SECURITY.md) for the full threat model and the controls ac
 atlas-insights/
 ├── apps/
 │   ├── web/                # Vite + React + Tailwind dashboard
+│   │   ├── Dockerfile      # multi-stage Vite build → nginx static + reverse proxy
+│   │   └── nginx.conf      # SPA fallback + /api proxy + security headers
 │   └── api/                # NestJS service: cache, throttle, helmet, validate
+│       └── Dockerfile      # multi-stage NestJS build → slim node runtime
 ├── libs/
 │   ├── shared-types/       # EarthquakeRecord, response envelopes, axis enums
 │   └── shared-utils/       # CSV parser + sanitization (browser- and node-safe)
+├── .github/workflows/      # CI pipeline (lint, typecheck, build, image builds)
 ├── .claude/                # AI-collaborator rules, commands, agents, skills
+├── docker-compose.yml      # Combined web + api stack (nginx fronts SPA + /api proxy)
+├── .dockerignore
 ├── nx.json
 ├── tsconfig.base.json
 ├── package.json            # npm workspaces + root scripts
@@ -107,6 +114,33 @@ To run the FE **without** the API (static demo mode), set `VITE_USE_DIRECT_FEED=
 | `npm run format`    | Prettier write                                            |
 | `npm run graph`     | Open the Nx project graph in your browser                 |
 | `npm run nx -- <…>` | Drop into Nx directly (e.g. `npm run nx -- run web:build`) |
+
+### Run the combined stack with Docker
+
+For a parity-with-prod run (single command, no Node toolchain on host):
+
+```bash
+docker compose up --build
+open http://localhost:8080
+```
+
+What the stack looks like:
+
+- **`api`** — NestJS service from [`apps/api/Dockerfile`](./apps/api/Dockerfile). Multi-stage build (`deps → build → runtime`), runs `node apps/api/dist/main.js` as a non-root user under `tini`. Not port-exposed on the host — only reachable from the `web` service on the internal docker network.
+- **`web`** — nginx image from [`apps/web/Dockerfile`](./apps/web/Dockerfile) serving the Vite production bundle and reverse-proxying `/api/*` → `http://api:3000/api/*`. Published on `${WEB_PORT:-8080}`. `VITE_API_BASE_URL=/api` is baked into the bundle so there are no cross-origin hops in production.
+- Both services declare healthchecks; `web` waits on `api`'s `/api/health` before accepting traffic.
+- Env values fall back to safe defaults; a root `.env` overrides them (`API_CORS_ORIGINS`, `USGS_FEED_URL`, `CACHE_TTL_SECONDS`, `THROTTLE_LIMIT`, etc. — see [`.env.example`](./.env.example)).
+
+To rebuild a single service: `docker compose build web` / `docker compose build api`.
+
+### Continuous integration
+
+Every push and PR runs [`.github/workflows/ci.yml`](./.github/workflows/ci.yml):
+
+1. **`verify`** — `npm ci` → `npm run lint` → `npm run typecheck` → `npm run build`. Node 20, npm cache enabled.
+2. **`docker`** (depends on `verify`) — builds both images via Buildx with a GHA layer cache. Images are not pushed — this is a smoke test that the Dockerfiles still produce a runnable artifact.
+
+Concurrency is grouped per-ref so a new push cancels superseded runs.
 
 ---
 
@@ -219,6 +253,7 @@ The canonical `selectedId` lives in Zustand; the Context derives the resolved re
 - OpenAPI / Swagger doc surface on the API.
 - Vitest + Testing Library suites for both apps; Playwright smoke test.
 - Service Worker offline cache on the FE.
+- Push CI-built images to a registry (GHCR) on tag, gated on the existing `verify` job.
 
 ---
 

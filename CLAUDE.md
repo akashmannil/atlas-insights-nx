@@ -180,6 +180,26 @@ cd apps/web && npm run dev
 cd apps/api && npm run start:dev
 ```
 
+### Containers
+
+```bash
+docker compose up --build       # boot the combined stack on http://localhost:8080
+docker compose build web        # rebuild only the web image
+docker compose build api        # rebuild only the api image
+docker compose down             # tear down the stack
+```
+
+The combined stack runs nginx (`web`) on `${WEB_PORT:-8080}` fronting the SPA + reverse-proxying `/api` → the `api` service. The `api` container is **not** host-exposed; it's only reachable on the docker network.
+
+### CI
+
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs on every push and PR to `master`:
+
+1. `verify` — `npm ci` → `lint` → `typecheck` → `build`.
+2. `docker` (needs `verify`) — builds both images via Buildx with a GHA layer cache.
+
+If you touch the Dockerfiles, nginx config, or compose file, expect the `docker` job to fail-fast on the next push. Build images locally first.
+
 ---
 
 ## 8. Folder-level cheat sheet
@@ -208,6 +228,15 @@ cd apps/api && npm run start:dev
 
 - `shared-types/` — zero-runtime-dep type-only package.
 - `shared-utils/` — pure functions safe to import from any runtime.
+
+### Root-level deployment artifacts
+
+- `apps/api/Dockerfile` — multi-stage NestJS build (deps → build → slim runtime). Non-root `node` user, `tini` as PID 1.
+- `apps/web/Dockerfile` — multi-stage Vite build → `nginx:1.27-alpine` serving the SPA + proxying `/api`.
+- `apps/web/nginx.conf` — SPA fallback, hashed-asset long cache, `/api` reverse proxy to `http://api:3000`, `/healthz` for probes.
+- `docker-compose.yml` — combined stack. Env values pull from a root `.env`; sane defaults inline.
+- `.dockerignore` — keeps `node_modules`, `dist`, env files, `.git`, and Claude-local files out of every build context.
+- `.github/workflows/ci.yml` — CI pipeline (see §7 → CI).
 
 ---
 

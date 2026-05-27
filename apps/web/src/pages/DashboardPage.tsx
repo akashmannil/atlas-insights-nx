@@ -93,7 +93,6 @@ export const DashboardPage = () => {
                   <TablePanel
                     records={filtered}
                     loading={isLoading}
-                    total={total}
                     isFetchingNextPage={isFetchingNextPage}
                     isComplete={isComplete}
                     onLoadMore={fetchNextPage}

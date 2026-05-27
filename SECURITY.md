@@ -17,8 +17,9 @@ Atlas Insights is a public-data dashboard with no authenticated user surface, bu
 | Information disclosure              | Stack traces / Express defaults leaking implementation                  | Global `HttpExceptionFilter` returns sanitized envelope; full stack only in server logs for 5xx               |
 | Log integrity                       | CR/LF injection in URLs / IPs                                           | `LoggingInterceptor` strips CR/LF and caps length before writing                                              |
 | Reverse-proxy spoofing              | Forged `X-Forwarded-For` to bypass rate limit                           | `app.set('trust proxy', 1)` — trusts exactly one hop                                                          |
-| Secret leakage                      | `.env` committed to git                                                 | `.gitignore` excludes `.env*.local` and `.env`; only `.env.example` is tracked                                |
+| Secret leakage                      | `.env` committed to git or baked into a container image                 | `.gitignore` excludes `.env*.local` and `.env`; `.dockerignore` strips env files from the build context too   |
 | Supply chain                        | Compromised transitive dependencies                                     | Minimal dependency surface (11 runtime deps in FE, 12 in API), all from well-maintained sources               |
+| Container compromise                | Process escape, privileged ops on the host                              | API runs as non-root `node` user under `tini`; only the nginx edge publishes a host port (API stays internal) |
 
 ---
 
