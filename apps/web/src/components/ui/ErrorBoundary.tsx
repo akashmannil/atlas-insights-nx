@@ -28,7 +28,6 @@ export class ErrorBoundary extends Component<Props, State> {
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     // In a real product this would forward to Sentry / Datadog. Logging to the
     // console is enough for an assessment build.
-    // eslint-disable-next-line no-console
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
 
