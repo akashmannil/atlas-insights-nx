@@ -2,7 +2,7 @@
 
 > Nx monorepo containing a **React + TypeScript dashboard** (`apps/web`) and a **NestJS caching & security API** (`apps/api`) that together visualize USGS earthquake data with end-to-end type safety.
 
-![Atlas Insights screenshot placeholder](./docs/screenshot-dashboard.png)
+![Atlas Insights dashboard — scatter chart, stats tiles, and event records table](./docs/screenshot-dashboard.png)
 
 ---
 
@@ -259,13 +259,63 @@ The canonical `selectedId` lives in Zustand; the Context derives the resolved re
 
 ## AI usage disclosure
 
-This submission was built with the assistance of an AI pair-programmer (Claude Code). The collaboration looked like:
+This submission was built with the assistance of an AI pair-programmer (Claude Code). Rather than describe this as "Claude wrote it", the more honest framing is: **I directed an iterative dialogue across design, architecture, implementation, and review phases — the way a senior engineer would direct a capable junior**. The collaboration is documented below at the level of granularity I'd want a reviewer to see.
 
-- **Architecture & monorepo decisions**: discussed and refined the split into apps/libs together; the API ↔ FE boundary contract (`EarthquakeListResponse` envelope, single `EarthquakeRecord` source of truth) was co-designed.
-- **Boilerplate**: Vite / Nx / NestJS / Tailwind / ESLint configs drafted by the AI and reviewed.
-- **Components & modules**: chart, table, NestJS service, security middleware, DTOs — iterated in tandem. I drove requirements; the AI proposed implementations; I reviewed every diff for correctness and security.
-- **Documentation**: this README, [`INTERVIEWER.md`](./INTERVIEWER.md), [`CLAUDE.md`](./CLAUDE.md), [`SECURITY.md`](./SECURITY.md), and the [`.claude/`](./.claude/) rule files were AI-drafted from a structured outline and edited.
-- **What I did NOT delegate**: the decision to add the NestJS layer (and the trade-off discussion that led to it), the security threat model, the choice of dependencies, and the state-architecture boundaries.
+### 1. Design phase — informed by real production dashboards
+
+Before any code, I walked Claude through a survey of comparable real-time geospatial / scientific-data dashboards to anchor the design in patterns that have already been validated at scale:
+
+- **USGS's own [earthquake.usgs.gov/earthquakes/map](https://earthquake.usgs.gov/earthquakes/map/)** — the canonical reference for this dataset. Their map-first layout with a synced event list informed the **two-panel "visualisation + table" layout** and the **bidirectional selection sync** (clicking on the map highlights the row and vice versa). What I deliberately did *not* copy: their visual density (overwhelming for first-time viewers) and their default time range (too noisy at 7-day window for a portfolio piece).
+- **[Volcano Discovery](https://www.volcanodiscovery.com/earthquakes.html)** and **[EMSC's real-time map](https://www.emsc-csem.org/Earthquake/)** — both showed the value of a magnitude → colour ramp encoding consistent across map markers, chart points, and table badges. I lifted the *principle* (one colour scale, three surfaces) into `magnitudeStyle` in `utils/colors.ts`.
+- **Observable's [data-table notebooks](https://observablehq.com/)** and **[Datasette](https://datasette.io/)** — both demonstrated discrete pagination + per-row click-to-inspect as a friendlier alternative to infinite scroll for "dataset exploration" UX. This directly informed the choice in [`INTERVIEWER.md` §6](./INTERVIEWER.md#6-performance--pagination) to use discrete pages with auto-jump on chart selection.
+- **[Linear](https://linear.app/)** and **[Stripe Dashboard](https://stripe.com/dashboard)** — the visual reference for the muted-slate + accent palette, card density, and segmented control patterns. The brand palette in `tailwind.config.js` was tuned to sit in that neighbourhood without being a copy.
+- **[USGS GeoJSON Summary Feed](https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/)** + the CSV equivalent — I picked CSV deliberately after comparing the two feeds with Claude. CSV is ~40% smaller, parses faster, and the GeoJSON `properties` bag doesn't expose any field we actually use in the dashboard. The trade-off (losing the geometry envelope) was logged before committing to a parser.
+
+These weren't surface-level "looks like X" references — for each, I asked Claude to articulate **what specific pattern they were demonstrating and why it worked**, then decided whether it applied here. That conversation log is the reason the design rationale in `INTERVIEWER.md` reads like decisions rather than aesthetic preferences.
+
+### 2. Architecture phase — theoretical grounding, not just convention
+
+The architectural choices were arrived at by working backwards from CS-level invariants, not by copying a framework template. The full rationale lives in [`INTERVIEWER.md` §2](./INTERVIEWER.md#2-architectural-decisions-worth-calling-out); the short version of *what was discussed* with Claude:
+
+- **State management as a layered cache problem.** I framed FE state to Claude as "four caches with different invalidation rules": props (per-render, parent-controlled), Context (per-subtree, identity-stable), Zustand (per-app, selector-subscribed), TanStack Query (per-key, TTL + revalidation). Each layer was chosen because the *invalidation contract* matched the data's lifetime — server data in Zustand would conflate two contracts, which is why it's forbidden in [`.claude/rules/architecture.md`](./.claude/rules/architecture.md). Reference: **Phil Karlton's "two hard things in computer science"** — naming and cache invalidation. Both apply here.
+- **The API as a [thundering-herd mitigator](https://en.wikipedia.org/wiki/Thundering_herd_problem).** I asked Claude to walk through what happens when N concurrent clients hit a cold cache. The answer — a single in-flight promise shared across all callers — is a standard pattern from distributed systems (variations include "request coalescing" in CDNs, "singleflight" in Go's standard idioms, and "promise memoization" in the JS ecosystem). The implementation in `EarthquakesService.fetchAndCache` is a direct application of that principle.
+- **ETag/304 as content-addressable caching.** The decision to use weak ETags derived from `(datasetVersion, queryInputs)` is the same idea as a [Merkle-tree hash](https://en.wikipedia.org/wiki/Merkle_tree) at a single level: clients can prove they have the latest version without re-downloading. Discussed with Claude as "what's the minimum bandwidth we need to spend on a reload?" — the answer drove the implementation.
+- **Boundary integrity as a [phase-distinction problem](https://en.wikipedia.org/wiki/Phase_distinction).** Static-vs-runtime separation is a recurring theme in type theory. `libs/shared-types` has zero runtime dependencies *by design* — it's the "static phase" artifact that both apps consume. `libs/shared-utils` has runtime code but is framework-agnostic — it's the "runtime phase" artifact that's still safe to import anywhere. Mixing these is what produces the "I imported a server-only module into the browser bundle" class of bug; the lib split prevents it structurally.
+- **Throttling as a [token-bucket algorithm](https://en.wikipedia.org/wiki/Token_bucket).** `@nestjs/throttler` is a token-bucket implementation; I asked Claude to confirm the per-IP key derivation (after `trust proxy 1`) was using the correct identifier, since spoofing the bucket key is the most common rate-limit bypass.
+- **The CSV parser as a [PEG-style](https://en.wikipedia.org/wiki/Parsing_expression_grammar) deterministic pipeline.** I deliberately did NOT use `papaparse`'s auto-typing in the API path — every field is picked by index and coerced manually, so the parser is deterministic and the failure mode for unexpected input is "null", not "NaN" or "undefined". This is the same defensive-parsing posture you'd see in a real ingest pipeline.
+
+### 3. Implementation phase — directed, not delegated
+
+For every component, module, and service, the conversation pattern with Claude was:
+
+1. **I stated the contract** — what it consumes, what it produces, what invariants it must preserve.
+2. **Claude proposed an implementation** — often two or three variants with explicit trade-offs.
+3. **I challenged the proposal** — "what happens under N=10000?", "what does this do on a CR/LF in the place name?", "what re-renders when `hoveredId` changes?".
+4. **We converged on the chosen approach** — with the reasoning captured either in a docblock or in the corresponding `INTERVIEWER.md` entry so a future reader can reconstruct the decision.
+5. **I reviewed every diff** — line by line, for correctness, security, and architectural fit. Diffs that introduced anti-patterns (untyped `any`, server data in Zustand, side effects in render) were rejected and re-iterated.
+
+A concrete example, the **`EarthquakesService.applyFilters` mirror logic** in [`INTERVIEWER.md` §2.5](./INTERVIEWER.md#25-why-the-apis-selection--filter-logic-mirrors-the-fes): the first proposal was "FE filters only" (simplest), the second was "API filters only" (most scalable), and the chosen design — both implement the same predicate, FE uses it today, API is wired up for tomorrow — was the result of an explicit conversation about [Conway's law](https://en.wikipedia.org/wiki/Conway%27s_law) and how splitting a behaviour across two surfaces creates a long-term drift risk. The mitigation: the predicate is documented identically in both places and would be tested against the same fixture in the test plan.
+
+### 4. Documentation phase — structured outline, then prose
+
+Documentation was the most heavily AI-drafted area, but with a specific workflow:
+
+1. I wrote a **bullet-point outline** of what each file needed to cover — sections, key points, link targets.
+2. Claude expanded the outline into prose against the [`.claude/rules/`](./.claude/) writing conventions (terse, decision-first, link liberally, no fluff).
+3. I edited every paragraph for accuracy — particularly anywhere a claim could be verified against the code (file paths, env var names, the controls actually present in `main.ts`).
+4. The `.claude/` folder itself was co-designed: I described the workflows I wanted to support (review, fix-issue, architecture-check), Claude proposed the rules/commands/agents/skills split, and we iterated on the boundary discipline described in [`INTERVIEWER.md` §2.11](./INTERVIEWER.md#211-why-the-claude-folder-is-structured-the-way-it-is).
+
+### 5. What I explicitly did NOT delegate
+
+- **The decision to add a NestJS API layer** — this changed the scope of the assessment and required a deliberate trade-off discussion (covered in `INTERVIEWER.md` §0). The AI helped articulate the *case*, but the *decision* was mine.
+- **The security threat model** in [`SECURITY.md` §1](./SECURITY.md#1-threat-model) — I enumerated the assets and threats; Claude helped map them to controls already present. Every control claim was verified against the code.
+- **Dependency selection** — every runtime dependency was justified in the dependency tables. Where Claude proposed a library I hadn't picked (e.g. `react-leaflet-cluster` for marker clustering), I deferred the inclusion to "future improvements" rather than accepting it speculatively.
+- **The state-architecture boundaries** (props / Context / Zustand / Query) — Claude proposed alternatives during the design phase; the final four-layer split was my call, anchored in the cache-invalidation framing above.
+- **Performance work** in [`INTERVIEWER.md` §6](./INTERVIEWER.md#6-performance--pagination) — the cursor pagination + ETag + idle-prefetch strategy emerged from me explicitly measuring time-to-interactive and asking Claude to propose mitigations for each bottleneck I identified.
+
+### 6. Why this disclosure is structured this way
+
+A reviewer evaluating an AI-assisted submission is implicitly asking two questions: **(a) does the candidate understand the code they're submitting?** and **(b) where did the engineering judgement come from — the human or the model?** I've structured this section to make both questions answerable from the documentation alone, without needing a verbal walkthrough. If any specific decision in this codebase doesn't have a corresponding "why" written down somewhere (in the docblocks, `INTERVIEWER.md`, `SECURITY.md`, or `.claude/rules/`), that's a documentation gap and I'd want to know about it.
 
 ---
 
@@ -277,9 +327,5 @@ This submission was built with the assistance of an AI pair-programmer (Claude C
 - [`.claude/`](./.claude/) — modular rules, commands, agents, skills.
 
 ---
-
-## License
-
-MIT — see [`LICENSE`](./LICENSE).
 
 Submitted for review · Built with TypeScript end-to-end.

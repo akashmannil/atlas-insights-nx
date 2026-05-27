@@ -122,7 +122,7 @@ The dashboard already has a left + right two-column grid (visualisation + table)
 - **`CircleMarker` instead of `Marker`.** Default Leaflet markers ship with bundler-unfriendly image paths. SVG circle markers also let us reuse the existing magnitude → colour ramp from the scatter chart, so the two views speak the same visual language.
 - **Native two-way selection.** The map subscribes to the same `selectedId` / `hoveredId` in Zustand that the chart and table already use; selecting from any of the three highlights everywhere.
 
-### 2.9 Why a Docker stack + CI pipeline (and the shape of each)
+### 2.10 Why a Docker stack + CI pipeline (and the shape of each)
 
 Originally I left these out to keep the review surface small. They're added now because:
 
@@ -136,7 +136,7 @@ CI is intentionally minimal: a `verify` job (lint → typecheck → build with n
 
 See [`.github/workflows/ci.yml`](./.github/workflows/ci.yml), [`apps/api/Dockerfile`](./apps/api/Dockerfile), [`apps/web/Dockerfile`](./apps/web/Dockerfile), [`apps/web/nginx.conf`](./apps/web/nginx.conf), [`docker-compose.yml`](./docker-compose.yml).
 
-### 2.10 Why the `.claude/` folder is structured the way it is
+### 2.11 Why the `.claude/` folder is structured the way it is
 
 Because this repo was AI-assisted (see the disclosure in [`README.md`](./README.md)), the `.claude/` folder is part of the deliverable — it's how the AI collaborator was constrained, not a personal scratchpad. Its shape mirrors the architecture of the codebase itself, so the same boundaries that govern the code govern the assistant.
 
@@ -170,7 +170,7 @@ The split also mirrors the architecture boundary discipline in `apps/` vs `libs/
 
 A practical consequence: `.claude/settings.local.json` is gitignored alongside `CLAUDE.local.md`, so individual contributors can loosen permissions or wire personal hooks without dragging teammates into their setup. Everything in `settings.json` and below is committed because it's part of the team contract for AI-assisted work in this repo.
 
-### 2.11 What I explicitly did NOT add
+### 2.12 What I explicitly did NOT add
 
 - **A database.** Pointless for a public read-only feed.
 - **Authentication.** No user surface to protect.

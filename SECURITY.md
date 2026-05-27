@@ -18,7 +18,7 @@ Atlas Insights is a public-data dashboard with no authenticated user surface, bu
 | Log integrity                       | CR/LF injection in URLs / IPs                                           | `LoggingInterceptor` strips CR/LF and caps length before writing                                              |
 | Reverse-proxy spoofing              | Forged `X-Forwarded-For` to bypass rate limit                           | `app.set('trust proxy', 1)` — trusts exactly one hop                                                          |
 | Secret leakage                      | `.env` committed to git or baked into a container image                 | `.gitignore` excludes `.env*.local` and `.env`; `.dockerignore` strips env files from the build context too   |
-| Supply chain                        | Compromised transitive dependencies                                     | Minimal dependency surface (11 runtime deps in FE, 12 in API), all from well-maintained sources               |
+| Supply chain                        | Compromised transitive dependencies                                     | Minimal dependency surface (10 third-party runtime deps in FE, 14 in API), all from well-maintained sources    |
 | Container compromise                | Process escape, privileged ops on the host                              | API runs as non-root `node` user under `tini`; only the nginx edge publishes a host port (API stays internal) |
 
 ---
@@ -93,7 +93,7 @@ The cursor pagination contract was designed with abuse-resistance in mind:
 - Weak `ETag` derived from `(datasetVersion, query)` means re-requesting the same page returns `304` with no body — a hostile reloader can't even amplify bandwidth.
 - The dataset cache key is constant; no per-request keys are written. This rules out a "fill the cache with garbage to evict legitimate entries" attack.
 
-### 3.6 Configuration
+### 3.7 Configuration
 
 - `class-validator`-validated env schema. Boot fails loudly on missing/malformed values — never silently at request time.
 - `USGS_FEED_URL` is asserted to be HTTPS.
