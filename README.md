@@ -6,7 +6,7 @@
 
 ---
 
-## ✨ Highlights
+## Highlights
 
 - **Nx monorepo** with two apps (`web`, `api`) and two shared libs (`shared-types`, `shared-utils`) — strict project boundaries, end-to-end TypeScript paths, single dependency graph.
 - **NestJS API layer** in front of the public USGS feed: in-memory cache with TTL and stampede prevention, `@nestjs/throttler` rate limiting, `helmet` security headers, `class-validator` DTOs, untrusted-input sanitization, sanitized error envelope, structured access logs.
@@ -20,7 +20,7 @@ See [`SECURITY.md`](./SECURITY.md) for the full threat model and the controls ac
 
 ---
 
-## 🏗 Workspace layout
+## Workspace layout
 
 ```text
 atlas-insights/
@@ -65,7 +65,7 @@ GET /api/earthquakes (helmet, throttle, validate, sanitize-on-ingest)
 
 ---
 
-## 🚀 Quick start
+## Quick start
 
 ### Prerequisites
 
@@ -144,7 +144,7 @@ Concurrency is grouped per-ref so a new push cancels superseded runs.
 
 ---
 
-## 📡 API surface
+## API surface
 
 | Method | Path                       | Purpose                                                                 | Throttle      |
 | ------ | -------------------------- | ----------------------------------------------------------------------- | ------------- |
@@ -175,7 +175,7 @@ The FE drives this from `useInfiniteQuery`: the first page (500 records) lands i
 
 ---
 
-## 📦 External dependencies
+## External dependencies
 
 ### Workspace root
 
@@ -223,7 +223,7 @@ The FE drives this from `useInfiniteQuery`: the first page (500 records) lands i
 
 ---
 
-## 🧠 State management approach (recap)
+## State management approach (recap)
 
 | Pattern           | Where                                                                          | Why                                                                                  |
 | ----------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
@@ -235,7 +235,7 @@ The canonical `selectedId` lives in Zustand; the Context derives the resolved re
 
 ---
 
-## ⚖️ Trade-offs
+## Trade-offs
 
 - **No router.** Single-page dashboard. `pages/` is in place so adding one is non-disruptive.
 - **No tests in this submission.** Pure helpers (`csv.ts`, `colors.ts`, `useEarthquakeStats`, `EarthquakesService.applyFilters`) are structured for trivial unit testing — see [`INTERVIEWER.md`](./INTERVIEWER.md) §4 for the plan I'd execute next.
@@ -245,7 +245,7 @@ The canonical `selectedId` lives in Zustand; the Context derives the resolved re
 
 ---
 
-## 🔭 Future improvements
+## Future improvements
 
 - Marker clustering on the map at low zoom levels (`react-leaflet-cluster`) — pays off once the visible dataset crosses ~2k markers.
 - Time-series panel — hourly / daily event bins.
@@ -257,7 +257,7 @@ The canonical `selectedId` lives in Zustand; the Context derives the resolved re
 
 ---
 
-## 🤖 AI usage disclosure
+## AI usage disclosure
 
 This submission was built with the assistance of an AI pair-programmer (Claude Code). The collaboration looked like:
 
@@ -269,7 +269,7 @@ This submission was built with the assistance of an AI pair-programmer (Claude C
 
 ---
 
-## 📚 Further reading
+## Further reading
 
 - [`INTERVIEWER.md`](./INTERVIEWER.md) — design rationale, requirement coverage matrix, testing plan.
 - [`SECURITY.md`](./SECURITY.md) — threat model + concrete controls.
@@ -278,7 +278,7 @@ This submission was built with the assistance of an AI pair-programmer (Claude C
 
 ---
 
-## 📜 License
+## License
 
 MIT — see [`LICENSE`](./LICENSE).
 

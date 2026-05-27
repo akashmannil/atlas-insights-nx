@@ -58,7 +58,7 @@ The deliberate split — **Zustand owns the id, Context exposes the resolved rec
 | Git repository                             | This repo                                                                   |
 | README with setup, dependencies, decisions | [`README.md`](./README.md)                                                  |
 | Code comments where non-obvious            | Throughout — focused on hooks, store, context, parser, NestJS modules       |
-| AI usage disclosure                        | [`README.md` § AI usage](./README.md#-ai-usage-disclosure)                   |
+| AI usage disclosure                        | [`README.md` § AI usage](./README.md#ai-usage-disclosure)                   |
 
 ---
 
@@ -136,7 +136,41 @@ CI is intentionally minimal: a `verify` job (lint → typecheck → build with n
 
 See [`.github/workflows/ci.yml`](./.github/workflows/ci.yml), [`apps/api/Dockerfile`](./apps/api/Dockerfile), [`apps/web/Dockerfile`](./apps/web/Dockerfile), [`apps/web/nginx.conf`](./apps/web/nginx.conf), [`docker-compose.yml`](./docker-compose.yml).
 
-### 2.10 What I explicitly did NOT add
+### 2.10 Why the `.claude/` folder is structured the way it is
+
+Because this repo was AI-assisted (see the disclosure in [`README.md`](./README.md)), the `.claude/` folder is part of the deliverable — it's how the AI collaborator was constrained, not a personal scratchpad. Its shape mirrors the architecture of the codebase itself, so the same boundaries that govern the code govern the assistant.
+
+```text
+.claude/
+├── settings.json          # Committed harness config (tool permissions, hooks)
+├── settings.local.json    # Gitignored personal overrides — never affects teammates
+├── rules/                 # Long-form conventions, loaded into every session
+│   ├── architecture.md    #   Project boundaries, data flow, state layers
+│   ├── api.md             #   NestJS conventions + security defaults
+│   ├── code-style.md      #   TypeScript / React / NestJS style rules
+│   └── testing.md         #   Tooling + ordered list of what to test next
+├── commands/              # Slash commands — repeatable, scoped workflows
+│   ├── review.md          #   /review — structured review against the rules
+│   └── fix-issue.md       #   /fix-issue — triage-first bug workflow
+├── agents/                # Persona definitions for sub-agent delegations
+│   └── code-reviewer.md   #   Senior-reviewer persona used by /review
+└── skills/                # Small, invocable procedures
+    └── architecture-check/SKILL.md   # 60-second pre-merge boundary check
+```
+
+Three principles drove the split:
+
+1. **Rules are declarative, not procedural.** `rules/*.md` describes invariants ("controllers stay thin", "no `any`", "server data lives in TanStack Query") rather than steps. They're loaded into every Claude Code session via [`CLAUDE.md`](./CLAUDE.md) and the in-repo `.claude/` discovery, so the assistant inherits the same conventions a new human contributor would read first.
+
+2. **Workflows belong in `commands/` and `skills/`, not in `rules/`.** Anything with an imperative shape ("triage a bug", "do a pre-merge gut-check") is a slash command or skill, so it can be invoked deliberately rather than re-derived from rules each time. `/review` and `/fix-issue` are the two recurring high-stakes operations, so they got dedicated commands; `architecture-check` is the one cross-cutting verification that's worth running before merging boundary-touching changes, so it lives as a skill.
+
+3. **Agents encode reviewer judgement, not just rules.** `agents/code-reviewer.md` defines the priorities (boundary integrity > security > types > performance > a11y > style) and the things to *ignore* (Prettier mechanical formatting, lint-fixable ordering). That separation matters: the rules file says *what* good code looks like; the agent file says *which violations are worth blocking on*. Without that, reviews drift into pedantry.
+
+The split also mirrors the architecture boundary discipline in `apps/` vs `libs/`: the **rules** are the equivalent of `libs/shared-types` (declarative, dependency-free), the **commands and skills** are the equivalent of `apps/*` (executable entry points), and the **agent persona** is the equivalent of the NestJS `app.module.ts` wiring — it composes rules and workflow into a behaviour. A future contributor (human or AI) can read `rules/` in isolation, or invoke a command without re-reading every rule each time, the same way the FE and API can be developed in isolation against `libs/shared-types`.
+
+A practical consequence: `.claude/settings.local.json` is gitignored alongside `CLAUDE.local.md`, so individual contributors can loosen permissions or wire personal hooks without dragging teammates into their setup. Everything in `settings.json` and below is committed because it's part of the team contract for AI-assisted work in this repo.
+
+### 2.11 What I explicitly did NOT add
 
 - **A database.** Pointless for a public read-only feed.
 - **Authentication.** No user surface to protect.

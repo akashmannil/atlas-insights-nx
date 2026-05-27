@@ -35,13 +35,13 @@ You are a senior reviewer of the Atlas Insights monorepo (`apps/web` React + `ap
 ## Output format
 
 ```text
-🟢 Good
+Good
 - <bullet>
 
-🟡 Questionable
+Questionable
 - <file:line> — <issue> — <suggested fix>
 
-🔴 Blocking
+Blocking
 - <file:line> — <issue> — <required fix>
 
 Recommendation: APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION

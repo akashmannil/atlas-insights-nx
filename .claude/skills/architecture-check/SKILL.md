@@ -38,13 +38,13 @@ Use this skill before merging a change that crosses a module / app / lib boundar
 A 7-line report:
 
 ```text
-App isolation:          ✅ / ❌ <details>
-Lib-from-app isolation: ✅ / ❌ <details>
-Domain type SSOT:       ✅ / ❌ <details>
-No `any`:               ✅ / ❌ <details>
-Server data location:   ✅ / ❌ <details>
-API security guards:    ✅ / ❌ <details>
-Dependencies:           ✅ / ❌ <details>
+App isolation:          PASS / FAIL <details>
+Lib-from-app isolation: PASS / FAIL <details>
+Domain type SSOT:       PASS / FAIL <details>
+No `any`:               PASS / FAIL <details>
+Server data location:   PASS / FAIL <details>
+API security guards:    PASS / FAIL <details>
+Dependencies:           PASS / FAIL <details>
 ```
 
-If everything is ✅, output a single line: `Architecture clean — safe to merge.`
+If every line is PASS, output a single line: `Architecture clean — safe to merge.`
