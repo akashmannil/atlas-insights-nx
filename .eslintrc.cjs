@@ -50,9 +50,13 @@ module.exports = {
     {
       // API-specific overrides: NestJS uses decorators heavily and benefits from
       // looser rules around any-typed decorator metadata.
+      // consistent-type-imports is disabled because emitDecoratorMetadata causes
+      // TypeScript to emit constructor parameter types as runtime values — imports
+      // that appear type-only to ESLint are genuine value imports in the output.
       files: ['apps/api/**/*.ts'],
       rules: {
         '@typescript-eslint/no-extraneous-class': 'off',
+        '@typescript-eslint/consistent-type-imports': 'off',
       },
     },
   ],
