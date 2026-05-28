@@ -12,8 +12,8 @@ The companion file `CLAUDE.local.md` is **gitignored** — use it for personal o
 
 - `apps/web` — a React + TypeScript dashboard visualizing USGS earthquake data.
 - `apps/api` — a NestJS caching & security API in front of the public USGS feed.
-- `libs/shared-types` — the canonical wire contract (`EarthquakeRecord`, response envelopes).
-- `libs/shared-utils` — the CSV parser and sanitization helpers, used by both apps.
+- `libs/shared-types` — the canonical wire contract (`EarthquakeRecord`, response envelopes, `DEFAULT_PAGE_SIZE`).
+- `libs/shared-utils` — the CSV parser, sanitization helpers, and the `computeEarthquakeStats` projection, used by both apps.
 
 It serves both as a working dashboard and as a reference for how the team thinks about:
 
@@ -100,7 +100,7 @@ Adding a new dependency requires explicit justification in the PR description. B
 - Services own caching, upstream calls, transformations.
 - Cross-cutting concerns (logging, exception handling, throttling) are wired in `app.module.ts`, not sprinkled per-controller.
 - DTOs use `class-validator` decorators. Trust the global `ValidationPipe` — don't re-validate inside controllers.
-- Never construct an `Error.message` from user input without sanitizing — log injection is real.
+- Never construct an `Error.message` or log line from user input without routing it through the shared `sanitize()` helper at `apps/api/src/common/log-sanitize.ts` — log injection is real. The exception filter and logging interceptor both already use it; new filters / interceptors / guards must too.
 
 ### State (FE)
 

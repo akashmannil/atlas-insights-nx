@@ -14,15 +14,15 @@ If you're adding tests, this is the order and tooling per app/lib.
 
 ## What to test, in order
 
-1. **Pure helpers first** — `libs/shared-utils/src/csv.ts`, `libs/shared-utils/src/sanitize.ts`, `apps/web/src/utils/colors.ts`. High coverage, low cost.
+1. **Pure helpers first** — `libs/shared-utils/src/csv.ts`, `libs/shared-utils/src/sanitize.ts`, `libs/shared-utils/src/stats.ts`, `apps/web/src/utils/colors.ts`, `apps/api/src/common/log-sanitize.ts`. High coverage, low cost.
 
-2. **Pure derivations** — `apps/web/src/hooks/useEarthquakeStats.ts`, `EarthquakesService.applyFilters`.
+2. **Pure derivations** — `apps/web/src/hooks/useEarthquakeStats.ts`, `apps/web/src/hooks/useFilteredEarthquakes.ts` (filtering is FE-only).
 
 3. **Zustand store actions** — toggle selection, reset filters, swap axes, switch `activeView`.
 
-4. **API service** — `EarthquakesService` with stubbed `Cache` + mocked `undici`. Cover: cache hit, cache miss, in-flight de-dup, upstream failure → 503.
+4. **API service** — `EarthquakesService` with stubbed `Cache` + mocked `undici`. Cover: cache hit, cache miss, in-flight de-dup, upstream failure → 503, ETag stability across pagination params.
 
-5. **API controller validation** — `supertest` against the boot app: malformed query → 400, unknown query key → 400, valid query → 200 with the expected envelope.
+5. **API controller validation** — `supertest` against the boot app: malformed query → 400, unknown query key (e.g. `?minMagnitude=5` — filters are intentionally rejected) → 400, valid query → 200 with the expected envelope.
 
 6. **FE components** — render with fixture data, assert callback invocation. Don't test Recharts or Leaflet internals; test our handlers (chart `onPointClick`, map marker `eventHandlers.click`, `<ViewSelector>` toggle calling `setActiveView`).
 

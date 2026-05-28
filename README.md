@@ -54,13 +54,17 @@ apps/api/src/earthquakes/earthquakes.service.ts
    ↓ parseEarthquakeCsv (libs/shared-utils)
    ↓ in-memory cache (5 min TTL, in-flight de-dup)
 GET /api/earthquakes (helmet, throttle, validate, sanitize-on-ingest)
-   ↓ fetch (apps/web/src/api/earthquakes.ts)
-   ↓ TanStack Query
-   ↓ useFilteredEarthquakes (Zustand filter slice)
+   ↓ fetch (apps/web/src/api/earthquakes.ts) — cursor + limit only
+   ↓ TanStack Query (useEarthquakes — useInfiniteQuery)
+   ↓ useFilteredEarthquakes (Zustand filter slice — client-side filters)
        ├→ ChartPanel  →  EarthquakeChart    (activeView === 'chart')
        ├→ MapPanel    →  EarthquakeMap      (activeView === 'map')
        └→ TablePanel  →  EarthquakeTable
             ↑ Selection / hover loops back via Zustand + Context
+
+Server-computed stats stream in parallel via useEarthquakeStats →
+GET /api/earthquakes/stats, both wired through computeEarthquakeStats
+in libs/shared-utils so the projection formula has one home.
 ```
 
 ---
@@ -158,17 +162,14 @@ Query parameters on `/api/earthquakes`:
 | -------------- | ------- | -------------------------------------------------------------- |
 | `cursor`       | int     | 0–1 000 000 (0-indexed offset for pagination)                  |
 | `limit`        | int     | 1–10 000 (page size; default 500 when `cursor` set)            |
-| `minMagnitude` | int     | 0–10                                                           |
-| `search`       | string  | 1–64 chars, printable (`[\p{L}\p{N}\s,.\-']+`)                 |
-| `tsunamiOnly`  | boolean | strict — `true`/`false` only                                   |
 
-Any other key returns a `400` (handled by the global `ValidationPipe`).
+Record-level filtering (magnitude, search, tsunami) lives in the FE — the API surface is intentionally pagination-only. Any other key returns a `400` (handled by the global `ValidationPipe`).
 
 ### Pagination + cache behaviour
 
 - **Cursor-based pagination.** `?cursor=N&limit=M` returns `data[N : N+M]`, with `meta.nextCursor` set to `N+M` (or `null` when at the end) and `meta.total` set to the full server-side dataset size.
 - **Pages are free server-side.** The full parsed dataset lives in one in-memory cache key — every page request is a slice of that array, not a re-parse and never a re-fetch (until the TTL expires).
-- **ETag short-circuit.** Each response carries a weak `ETag` derived from the dataset version + query inputs. On a refresh the client sends `If-None-Match`; if unchanged, the API returns `304 Not Modified` with an empty body. Reloads cost ~200 bytes.
+- **ETag short-circuit.** Each response carries a weak `ETag` derived from `(datasetVersion, cursor, limit)`. On a refresh the client sends `If-None-Match`; if unchanged, the API returns `304 Not Modified` with an empty body. Reloads cost ~200 bytes. Free-text input is intentionally excluded from the key — see [`SECURITY.md`](./SECURITY.md) §3.6.
 - **Stampede de-duplication.** Concurrent cache-misses share a single in-flight promise → exactly one upstream USGS call regardless of request volume.
 
 The FE drives this from `useInfiniteQuery`: the first page (500 records) lands in ~200 ms, then subsequent pages auto-stream on a 250 ms idle tick. The chart, table, and stats all progressively fill from the same accumulated array.
@@ -220,6 +221,7 @@ The FE drives this from `useInfiniteQuery`: the first page (500 records) lands i
 ### `libs/shared-utils`
 
 - `papaparse` — only runtime dep; same parser runs on both ends of the wire.
+- `computeEarthquakeStats` (pure function, no deps) — server stats route and FE fallback / sample-mode all consume the same projection so the formula has a single home.
 
 ---
 
@@ -238,10 +240,10 @@ The canonical `selectedId` lives in Zustand; the Context derives the resolved re
 ## Trade-offs
 
 - **No router.** Single-page dashboard. `pages/` is in place so adding one is non-disruptive.
-- **No tests in this submission.** Pure helpers (`csv.ts`, `colors.ts`, `useEarthquakeStats`, `EarthquakesService.applyFilters`) are structured for trivial unit testing — see [`INTERVIEWER.md`](./INTERVIEWER.md) §4 for the plan I'd execute next.
+- **No tests in this submission.** Pure helpers (`csv.ts`, `sanitize.ts`, `stats.ts`, `colors.ts`, `useEarthquakeStats`) are structured for trivial unit testing — see [`INTERVIEWER.md`](./INTERVIEWER.md) §4 for the plan I'd execute next.
 - **In-memory API cache.** Survives within a single process. A multi-instance deploy would point `@nestjs/cache-manager` at Redis with a one-line change.
 - **Synchronous CSV parsing in the API.** ~10k rows parses in <100 ms. If the feed scaled to 100k+ I'd move it to a worker thread.
-- **Client-side filtering in the FE.** Re-runs on each keystroke. The API also supports filter params — at scale we'd debounce search and push filter execution server-side.
+- **Client-side filtering in the FE.** Re-runs on each keystroke. At scale we'd debounce the search input and push filter execution server-side (which would also require a filter-aware ETag key and filter-aware totals).
 
 ---
 
@@ -294,7 +296,7 @@ For every component, module, and service, the conversation pattern with Claude w
 4. **We converged on the chosen approach** — with the reasoning captured either in a docblock or in the corresponding `INTERVIEWER.md` entry so a future reader can reconstruct the decision.
 5. **I reviewed every diff** — line by line, for correctness, security, and architectural fit. Diffs that introduced anti-patterns (untyped `any`, server data in Zustand, side effects in render) were rejected and re-iterated.
 
-A concrete example, the **`EarthquakesService.applyFilters` mirror logic** in [`INTERVIEWER.md` §2.5](./INTERVIEWER.md#25-why-the-apis-selection--filter-logic-mirrors-the-fes): the first proposal was "FE filters only" (simplest), the second was "API filters only" (most scalable), and the chosen design — both implement the same predicate, FE uses it today, API is wired up for tomorrow — was the result of an explicit conversation about [Conway's law](https://en.wikipedia.org/wiki/Conway%27s_law) and how splitting a behaviour across two surfaces creates a long-term drift risk. The mitigation: the predicate is documented identically in both places and would be tested against the same fixture in the test plan.
+A concrete example, the **filtering surface** in [`INTERVIEWER.md` §2.5](./INTERVIEWER.md#25-why-filtering-lives-only-on-the-fe): the first proposal was "FE filters only" (simplest), the second was "API filters only" (most scalable), and a middle design briefly shipped both — the same predicate on the API DTO and in the FE's `useFilteredEarthquakes`, FE-active today and API "wired up for tomorrow". That mirror was the [Conway's-law](https://en.wikipedia.org/wiki/Conway%27s_law) drift risk in the flesh: the API copy was never exercised, so it rotted into dead code (an `@IsInt` magnitude that would have rejected the FE's decimal slider, free-text `search` in the ETag key). The follow-up review removed the server-side copy entirely — the API surface is now pagination-only, and the lesson logged in §2.5 is that "wired up for tomorrow" is a liability unless tomorrow's coupled requirements (debounce, filter-aware totals, filter-aware ETag) ship with it.
 
 ### 4. Documentation phase — structured outline, then prose
 
