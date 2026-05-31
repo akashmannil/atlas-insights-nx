@@ -4,6 +4,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { EarthquakesModule } from './earthquakes/earthquakes.module';
+import { GraphModule } from './graph/graph.module';
 import { HealthModule } from './health/health.module';
 import { validateEnv } from './config/env.validation';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -51,6 +52,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
       ],
     }),
     EarthquakesModule,
+    GraphModule,
     HealthModule,
   ],
   providers: [

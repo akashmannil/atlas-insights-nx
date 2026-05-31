@@ -26,7 +26,12 @@ import { useEarthquakeStore } from '@/store/useEarthquakeStore';
  * the SelectedEarthquakeContext. This separation keeps the page thin and
  * easy to test.
  */
-export const DashboardPage = () => {
+interface DashboardPageProps {
+  /** Switch to the architecture knowledge-graph view. */
+  onOpenGraph: () => void;
+}
+
+export const DashboardPage = ({ onOpenGraph }: DashboardPageProps) => {
   const {
     records,
     total,
@@ -136,7 +141,15 @@ export const DashboardPage = () => {
             className="text-brand-600 underline-offset-2 hover:underline"
           >
             Feed documentation
-          </a>
+          </a>{' '}
+          ·{' '}
+          <button
+            type="button"
+            onClick={onOpenGraph}
+            className="text-brand-600 underline-offset-2 hover:underline"
+          >
+            Architecture graph
+          </button>
         </footer>
       </div>
     </SelectedEarthquakeProvider>

@@ -121,3 +121,68 @@ export interface HealthResponse {
     readonly ageMs: number | null;
   };
 }
+
+/**
+ * Knowledge-graph wire contract for `GET /api/graph`.
+ *
+ * The API parses the repo's `KNOWLEDGE_GRAPH.md` triple store into this shape;
+ * the web app renders it (triples → Mermaid). Keeping the node/relation
+ * vocabularies here means both ends agree on the closed sets without the FE
+ * re-parsing markdown.
+ */
+export type GraphNodeType =
+  | 'module'
+  | 'file'
+  | 'class'
+  | 'function'
+  | 'endpoint'
+  | 'service'
+  | 'config'
+  | 'external_lib'
+  | 'datastore';
+
+/** Closed relation vocabulary mirrored from `KNOWLEDGE_GRAPH.md` §1. */
+export type GraphRelation =
+  | 'imports'
+  | 'calls'
+  | 'defines'
+  | 'inherits'
+  | 'implements'
+  | 'depends_on'
+  | 'exposes'
+  | 'reads_from'
+  | 'writes_to'
+  | 'configures'
+  | 'tested_by'
+  | 'instantiates'
+  | 'related_to';
+
+export interface GraphNode {
+  /** Canonical snake_cased id from the triple store. */
+  readonly id: string;
+  /** Resolved from the node's `instance_of` triple; defaults to `file`. */
+  readonly type: GraphNodeType;
+  /** Human-readable label derived for display (falls back to `id`). */
+  readonly label: string;
+  /** From a `has_attribute->(layer:…)` triple, when present. */
+  readonly layer?: string;
+  /** From a `has_attribute->(route:…)` triple, when present. */
+  readonly route?: string;
+}
+
+export interface GraphEdge {
+  readonly from: string;
+  readonly to: string;
+  readonly relation: GraphRelation;
+}
+
+export interface KnowledgeGraphResponse {
+  readonly nodes: readonly GraphNode[];
+  readonly edges: readonly GraphEdge[];
+  readonly meta: {
+    /** ms-since-epoch when the API parsed the source. */
+    readonly generatedAt: number;
+    readonly nodeCount: number;
+    readonly edgeCount: number;
+  };
+}
