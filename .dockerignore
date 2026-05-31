@@ -28,6 +28,8 @@ Thumbs.db
 
 # Docs / project metadata not needed at runtime
 *.md
+# ...except the knowledge graph, which the API parses at runtime for /api/graph.
+!KNOWLEDGE_GRAPH.md
 docs
 
 # Claude personal config

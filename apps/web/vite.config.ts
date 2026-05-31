@@ -41,6 +41,7 @@ export default defineConfig(({ mode }) => {
             charts: ['recharts'],
             map: ['leaflet', 'react-leaflet'],
             query: ['@tanstack/react-query', '@tanstack/react-table'],
+            mermaid: ['mermaid'],
           },
         },
       },

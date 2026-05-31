@@ -48,6 +48,9 @@ COPY --from=build /workspace/apps/api/package.json ./apps/api/package.json
 COPY --from=build /workspace/libs ./libs
 COPY --from=build /workspace/package.json ./package.json
 
+# The /api/graph endpoint parses this at runtime; resolved relative to cwd (/app).
+COPY KNOWLEDGE_GRAPH.md ./KNOWLEDGE_GRAPH.md
+
 USER node
 
 EXPOSE 3000
