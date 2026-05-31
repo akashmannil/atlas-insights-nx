@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { type Observable, tap } from 'rxjs';
 import type { Request, Response } from 'express';
+import { sanitize } from '../log-sanitize';
 
 /**
  * Lightweight access log.
@@ -48,5 +49,3 @@ export class LoggingInterceptor implements NestInterceptor {
   }
 }
 
-// Strip CR/LF so a hostile path can't forge fake log lines.
-const sanitize = (s: string): string => s.replace(/[\r\n]/g, ' ').slice(0, 256);

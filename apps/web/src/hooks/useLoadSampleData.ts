@@ -1,11 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
-import { parseEarthquakeCsv } from '@atlas/shared-utils';
+import { computeEarthquakeStats, parseEarthquakeCsv } from '@atlas/shared-utils';
 import type { EarthquakeListResponse, EarthquakeStatsResponse } from '@atlas/shared-types';
 import { EARTHQUAKES_QUERY_KEY, EARTHQUAKES_STATS_KEY } from '@/api/earthquakes';
-
-const SIGNIFICANT_THRESHOLD = 600;
 
 /**
  * Loads the bundled sample CSV into the TanStack Query cache, replacing live
@@ -16,9 +14,11 @@ export const useLoadSampleData = () => {
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [isSampleMode, setIsSampleMode] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadSample = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const resp = await fetch('/sample.csv');
       if (!resp.ok) throw new Error(`Could not fetch sample CSV (${resp.status})`);
@@ -36,34 +36,17 @@ export const useLoadSampleData = () => {
         { pages: [page], pageParams: [0] },
       );
 
-      let magSum = 0;
-      let magCount = 0;
-      let maxMag: number | null = null;
-      let tsunamiCount = 0;
-      let significantCount = 0;
-      for (const r of records) {
-        if (r.magnitude !== null) {
-          magSum += r.magnitude;
-          magCount += 1;
-          if (maxMag === null || r.magnitude > maxMag) maxMag = r.magnitude;
-        }
-        if (r.tsunami === 1) tsunamiCount += 1;
-        if ((r.significance ?? 0) >= SIGNIFICANT_THRESHOLD) significantCount += 1;
-      }
-
       const stats: EarthquakeStatsResponse = {
-        count: records.length,
-        averageMagnitude: magCount > 0 ? magSum / magCount : null,
-        maxMagnitude: maxMag,
-        tsunamiCount,
-        significantCount,
+        ...computeEarthquakeStats(records),
         generatedAt: now,
       };
       queryClient.setQueryData<EarthquakeStatsResponse>(EARTHQUAKES_STATS_KEY, stats);
 
       setIsSampleMode(true);
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load sample data.';
       console.error('[sample] failed to load fixture data:', err);
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +56,10 @@ export const useLoadSampleData = () => {
     queryClient.invalidateQueries({ queryKey: EARTHQUAKES_QUERY_KEY });
     queryClient.invalidateQueries({ queryKey: EARTHQUAKES_STATS_KEY });
     setIsSampleMode(false);
+    setError(null);
   }, [queryClient]);
 
-  return { loadSample, clearSample, isLoading, isSampleMode };
+  const dismissError = useCallback(() => setError(null), []);
+
+  return { loadSample, clearSample, isLoading, isSampleMode, error, dismissError };
 };

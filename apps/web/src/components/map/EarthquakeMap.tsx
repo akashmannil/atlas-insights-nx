@@ -1,5 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import type { Map as LeafletMap } from 'leaflet';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import type { EarthquakeRecord } from '@atlas/shared-types';
 import { magnitudeStyle } from '@/utils/colors';
@@ -69,8 +68,6 @@ const EarthquakeMapImpl = ({
   onPointClick,
   onPointHover,
 }: EarthquakeMapProps) => {
-  const mapRef = useRef<LeafletMap | null>(null);
-
   const points = useMemo<MapPoint[]>(() => {
     const out: MapPoint[] = [];
     for (const r of records) {
@@ -105,7 +102,6 @@ const EarthquakeMapImpl = ({
       worldCopyJump
       scrollWheelZoom
       className="h-full w-full"
-      ref={mapRef}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

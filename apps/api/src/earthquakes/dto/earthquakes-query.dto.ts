@@ -1,38 +1,18 @@
-import { Transform, Type } from 'class-transformer';
-import {
-  IsBoolean,
-  IsInt,
-  IsOptional,
-  IsString,
-  Length,
-  Matches,
-  Max,
-  Min,
-} from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
 /**
  * Query parameters for `GET /api/earthquakes`.
  *
- * Validation rationale:
- *   - `minMagnitude` clamped 0–10 — physical bounds + prevents `Infinity` abuse.
- *   - `limit` clamped 1–10_000 — covers the realistic monthly feed.
- *   - `search` length-capped + regex-restricted to printable ASCII —
- *     blocks log-injection and exotic Unicode that has no business in a
- *     place-name search.
- *   - `tsunamiOnly` strictly boolean (rejects "yes"/"1"/etc unless explicitly
- *     transformed).
- *
- * Combined with the global `ValidationPipe({forbidNonWhitelisted: true})`,
- * any unknown query key returns a 400 — mass-assignment is impossible.
+ * The endpoint is intentionally a pagination-only surface — record-level
+ * filtering (magnitude / search / tsunami) happens client-side against the
+ * loaded slice. Adding filter params here is an explicit design decision (see
+ * `INTERVIEWER.md` §2): it would require filter-aware totals, ETag keys, and
+ * debounced refetch on every keystroke. None of that is wired up, so the
+ * surface stays narrow and the global `ValidationPipe({forbidNonWhitelisted})`
+ * rejects any unknown filter param as 400.
  */
 export class EarthquakesQueryDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(10)
-  minMagnitude?: number;
-
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -51,17 +31,4 @@ export class EarthquakesQueryDto {
   @Min(0)
   @Max(1_000_000)
   cursor?: number;
-
-  @IsOptional()
-  @IsString()
-  @Length(1, 64)
-  @Matches(/^[\p{L}\p{N}\s,.\-']+$/u, {
-    message: 'search may only contain letters, numbers, spaces, and , . - \'',
-  })
-  search?: string;
-
-  @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true' || value === '1')
-  @IsBoolean()
-  tsunamiOnly?: boolean;
 }

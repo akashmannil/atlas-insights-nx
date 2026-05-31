@@ -1,9 +1,10 @@
-import type {
-  EarthquakeListResponse,
-  EarthquakeRecord,
-  EarthquakeStatsResponse,
+import {
+  DEFAULT_PAGE_SIZE,
+  type EarthquakeListResponse,
+  type EarthquakeRecord,
+  type EarthquakeStatsResponse,
 } from '@atlas/shared-types';
-import { parseEarthquakeCsv } from '@atlas/shared-utils';
+import { computeEarthquakeStats, parseEarthquakeCsv } from '@atlas/shared-utils';
 
 /**
  * Network entry points for earthquake data.
@@ -23,9 +24,6 @@ const USE_DIRECT_FEED = import.meta.env.VITE_USE_DIRECT_FEED === 'true';
 const DIRECT_FEED_URL =
   import.meta.env.VITE_USGS_FEED_URL ??
   'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.csv';
-
-/** Page size used for cursor pagination. */
-export const PAGE_SIZE = 500;
 
 export const EARTHQUAKES_QUERY_KEY = ['earthquakes', 'pages'] as const;
 export const EARTHQUAKES_STATS_KEY = ['earthquakes', 'stats'] as const;
@@ -47,7 +45,7 @@ const fetchApiPage = async (
   cursor: number,
   signal?: AbortSignal,
 ): Promise<EarthquakeListResponse> => {
-  const url = `${API_BASE}/earthquakes?cursor=${cursor}&limit=${PAGE_SIZE}`;
+  const url = `${API_BASE}/earthquakes?cursor=${cursor}&limit=${DEFAULT_PAGE_SIZE}`;
   const response = await fetch(url, {
     signal,
     headers: { Accept: 'application/json' },
@@ -79,24 +77,36 @@ const fetchApiStats = async (signal?: AbortSignal): Promise<EarthquakeStatsRespo
 // ---------- Direct mode (FE-only, no API deployed) ----------
 
 let directCache: { fetchedAt: number; records: EarthquakeRecord[] } | null = null;
+let directInflight: Promise<EarthquakeRecord[]> | null = null;
 const DIRECT_TTL_MS = 5 * 60 * 1000;
 
 const getDirectDataset = async (signal?: AbortSignal): Promise<EarthquakeRecord[]> => {
   if (directCache && Date.now() - directCache.fetchedAt < DIRECT_TTL_MS) {
     return directCache.records;
   }
-  const response = await fetch(DIRECT_FEED_URL, {
-    signal,
-    headers: { Accept: 'text/csv' },
+  // Coalesce concurrent callers (e.g. infinite-query firing pages while stats
+  // resolves) onto a single upstream request — matches the API service's
+  // stampede protection.
+  if (directInflight) return directInflight;
+
+  directInflight = (async () => {
+    const response = await fetch(DIRECT_FEED_URL, {
+      signal,
+      headers: { Accept: 'text/csv' },
+    });
+    if (!response.ok) {
+      throw new Error(`USGS feed responded with ${response.status} ${response.statusText}.`);
+    }
+    const csv = await response.text();
+    if (!csv.trim()) throw new Error('USGS feed returned an empty response.');
+    const records = parseEarthquakeCsv(csv);
+    directCache = { fetchedAt: Date.now(), records };
+    return records;
+  })().finally(() => {
+    directInflight = null;
   });
-  if (!response.ok) {
-    throw new Error(`USGS feed responded with ${response.status} ${response.statusText}.`);
-  }
-  const csv = await response.text();
-  if (!csv.trim()) throw new Error('USGS feed returned an empty response.');
-  const records = parseEarthquakeCsv(csv);
-  directCache = { fetchedAt: Date.now(), records };
-  return records;
+
+  return directInflight;
 };
 
 const fetchDirectPage = async (
@@ -104,7 +114,7 @@ const fetchDirectPage = async (
   signal?: AbortSignal,
 ): Promise<EarthquakeListResponse> => {
   const all = await getDirectDataset(signal);
-  const slice = all.slice(cursor, cursor + PAGE_SIZE);
+  const slice = all.slice(cursor, cursor + DEFAULT_PAGE_SIZE);
   const nextOffset = cursor + slice.length;
   return {
     data: slice,
@@ -123,27 +133,8 @@ const fetchDirectStats = async (
   signal?: AbortSignal,
 ): Promise<EarthquakeStatsResponse> => {
   const records = await getDirectDataset(signal);
-  let magSum = 0;
-  let magCount = 0;
-  let maxMag: number | null = null;
-  let tsunamiCount = 0;
-  let significantCount = 0;
-  const SIGNIFICANT_THRESHOLD = 600;
-  for (const r of records) {
-    if (r.magnitude !== null) {
-      magSum += r.magnitude;
-      magCount += 1;
-      if (maxMag === null || r.magnitude > maxMag) maxMag = r.magnitude;
-    }
-    if (r.tsunami === 1) tsunamiCount += 1;
-    if ((r.significance ?? 0) >= SIGNIFICANT_THRESHOLD) significantCount += 1;
-  }
   return {
-    count: records.length,
-    averageMagnitude: magCount > 0 ? magSum / magCount : null,
-    maxMagnitude: maxMag,
-    tsunamiCount,
-    significantCount,
+    ...computeEarthquakeStats(records),
     generatedAt: Date.now(),
   };
 };

@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { HealthResponse } from '@atlas/shared-types';
-import { type EarthquakesService } from '../earthquakes/earthquakes.service';
+import { EarthquakesService } from '../earthquakes/earthquakes.service';
 
 /**
  * Liveness + readiness in one endpoint.

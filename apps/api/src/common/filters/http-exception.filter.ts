@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { sanitize } from '../log-sanitize';
 
 /**
  * Single exception filter for all uncaught errors.
@@ -38,14 +39,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? this.extractClientMessage(exception)
         : 'Internal server error';
 
+    const safeMethod = sanitize(request.method);
+    const safeUrl = sanitize(request.url);
+
     if (status >= 500) {
       // Full stack only for 5xx — 4xx are usually client error and just noise in logs.
       this.logger.error(
-        `[${request.method} ${request.url}] ${status}`,
+        `[${safeMethod} ${safeUrl}] ${status}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
     } else {
-      this.logger.warn(`[${request.method} ${request.url}] ${status} — ${safeMessage}`);
+      this.logger.warn(`[${safeMethod} ${safeUrl}] ${status} — ${sanitize(safeMessage)}`);
     }
 
     response.status(status).json({

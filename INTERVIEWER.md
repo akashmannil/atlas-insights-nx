@@ -97,9 +97,13 @@ The lib has **zero runtime dependencies and no framework imports**, so it's safe
 
 Same parsing rules at both ends → same null-handling, same sanitization, same drop-rows-with-missing-geometry behaviour. If we ever moved parsing into a Web Worker, the lib's framework-agnostic shape makes that a one-line import change.
 
-### 2.5 Why the API's selection / filter logic mirrors the FE's
+### 2.5 Why filtering lives only on the FE
 
-`EarthquakesService.applyFilters` and the FE's `useFilteredEarthquakes` apply the same predicate. That's intentional — a future "URL-shareable filter state" feature can be served purely server-side without a behaviour change. Today, both apply locally and the API filter params are unused by the FE (which fetches everything once and filters in-memory for the snappiest UX).
+Earlier revisions of this codebase had filter parameters (`minMagnitude`, `search`, `tsunamiOnly`) on both the API DTO and the FE's `useFilteredEarthquakes`. The FE never sent them — it filtered the accumulated pages in memory — so the server-side implementation was dead code that needed parallel maintenance and broadened the API's attack surface (free-text `search` in the ETag key, an extra `@IsNumber` decimal-vs-int trap).
+
+The current shape is honest: the API surface is **pagination-only**, and record-level filtering happens client-side via `useFilteredEarthquakes`. Pushing filters server-side is still the right answer once the dataset outgrows a single in-memory page-set (~50k records), but it's a deliberate change with three coupled requirements — debounced search, filter-aware totals, and a filter-aware ETag key — none of which exist today. See [`SECURITY.md`](./SECURITY.md) §3.2 for the threat-model justification.
+
+The same projection rule applies to **stats**: both the API stats endpoint and the FE's sample-mode / fallback paths share `computeEarthquakeStats` in `libs/shared-utils`, so the average / max / significant-count formulas have one home.
 
 ### 2.6 Why the FE keeps a "direct mode"
 
@@ -190,8 +194,8 @@ Detailed inventory in [`SECURITY.md`](./SECURITY.md). The headline:
 - Global `ValidationPipe({whitelist, forbidNonWhitelisted})` + strict DTO — unknown query keys are a 400, regex-bounded `search`.
 - Untrusted-input sanitization at the ingestion boundary (`libs/shared-utils/src/sanitize.ts`): strips control characters, HTML-like tags, caps length.
 - `class-validator`-validated env schema; HTTPS-only upstream URL.
-- Sanitized error envelope via global `HttpExceptionFilter`; stack traces only in server logs for 5xx.
-- `LoggingInterceptor` strips CR/LF from URLs and IPs (no log injection) and never logs bodies.
+- Sanitized error envelope via global `HttpExceptionFilter`; stack traces only in server logs for 5xx, and every logged string (`method`, `url`, derived message) routed through the shared `sanitize()` helper at `apps/api/src/common/log-sanitize.ts`.
+- `LoggingInterceptor` and `HttpExceptionFilter` share that same `sanitize()` helper for CR/LF + length capping — one source of truth instead of two near-duplicates.
 - `app.set('trust proxy', 1)` — accurate client IP without enabling XFF spoofing.
 - In-flight de-duplication of upstream fetches — cold-cache stampede triggers exactly one USGS call.
 
@@ -201,10 +205,10 @@ Detailed inventory in [`SECURITY.md`](./SECURITY.md). The headline:
 
 In this order:
 
-1. **Pure helpers** — `parseEarthquakeCsv`, `sanitizePlace`, `magnitudeStyle`, `useEarthquakeStats`, `EarthquakesService.applyFilters`.
+1. **Pure helpers** — `parseEarthquakeCsv`, `sanitizePlace`, `computeEarthquakeStats`, `magnitudeStyle`, `useFilteredEarthquakes`, the shared `sanitize()` log helper.
 2. **Store actions** — Zustand store in isolation: selection toggle, filter reset, axis swap.
 3. **Service tests** — `EarthquakesService` with a stubbed `Cache` + mocked `undici` (`MockAgent`). Cover cache-hit, cache-miss, in-flight dedup, upstream failure → 503.
-4. **Controller validation** — supertest `GET /api/earthquakes?minMagnitude=999` → 400; unknown query key → 400.
+4. **Controller validation** — supertest `GET /api/earthquakes?cursor=-1` → 400; unknown query key (`?minMagnitude=5`) → 400.
 5. **FE component tests** — render `<EarthquakeTable>` with fixture rows, assert row click fires the handler.
 6. **One integration test** — render `<DashboardPage>` with a mocked fetch returning a fixture envelope; click a row, assert chart highlight overlay appears.
 7. **One Playwright smoke** — boot both apps against a fixture USGS URL (MSW server), click a chart point, assert the matching row is visible and selected.
@@ -277,7 +281,7 @@ This replaces an earlier infinite-streaming model that, while elegant, made ever
 - The map renders one `CircleMarker` per visible record. Past ~5k visible markers the interaction starts to chug; the next step is `react-leaflet-cluster` at low zoom levels.
 - Map tiles are fetched from the public OpenStreetMap CDN. Production deployments should either self-host tiles or proxy through a tile provider with a known SLA.
 - API cache is in-memory and per-process. Multi-replica deploy would point `@nestjs/cache-manager` at Redis.
-- Server-side filters (`minMagnitude`, `search`, `tsunamiOnly`) exist on the API but aren't used by the FE today — filtering still happens client-side on accumulated pages. Pushing filters to the server is the obvious next step for datasets that grow beyond ~50k rows.
+- Filtering is client-side only; the API is a pagination-only surface. Pushing filters server-side is the obvious next step for datasets that grow beyond ~50k rows, but it's a coupled change (debounce + filter-aware totals + filter-aware ETag) and was kept out of scope deliberately. See §2.5.
 
 ---
 

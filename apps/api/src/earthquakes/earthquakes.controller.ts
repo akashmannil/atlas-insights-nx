@@ -1,8 +1,7 @@
 import { Controller, Get, Headers, HttpStatus, Query, Res } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
-import { type EarthquakesQueryDto } from './dto/earthquakes-query.dto';
-import { type EarthquakesService } from './earthquakes.service';
+import { EarthquakesQueryDto } from './dto/earthquakes-query.dto';
+import { EarthquakesService } from './earthquakes.service';
 
 /**
  * Public read-only endpoints for the dashboard.
@@ -25,7 +24,6 @@ export class EarthquakesController {
   constructor(private readonly service: EarthquakesService) {}
 
   @Get()
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   async list(
     @Query() query: EarthquakesQueryDto,
     @Headers('if-none-match') ifNoneMatch: string | undefined,

@@ -18,15 +18,16 @@ These are **on by default**. If you remove or relax any of them, document why in
 - Global `ThrottlerGuard` registered as `APP_GUARD`.
 - CORS allowlist from env, methods restricted to `GET`, `credentials: false`.
 - `app.set('trust proxy', 1)` — never `true`.
-- Global `HttpExceptionFilter` — returns a sanitized envelope, no stack traces to clients.
-- `LoggingInterceptor` — strips CR/LF from URLs and IPs; never logs bodies.
+- Global `HttpExceptionFilter` — returns a sanitized envelope, no stack traces to clients. Every logged string (`method`, `url`, derived message) is routed through the shared `sanitize()` helper.
+- `LoggingInterceptor` — strips CR/LF from URLs and IPs via the same shared `sanitize()` helper; never logs bodies.
+- Shared log sanitizer at `apps/api/src/common/log-sanitize.ts`. Use it in any new filter / interceptor / guard that writes user-derived strings to the logger — do not re-implement.
 
 ## Adding a new endpoint
 
 1. **Define a DTO** with `class-validator` decorators on every accepted field. Bound every numeric range. Constrain every string with `@Length` and `@Matches` where realistic.
 2. **Throttle deliberately.** Inherit the global default, or use `@Throttle({...})` to tighten on heavy routes. Use `@SkipThrottle()` only for health probes.
 3. **Set `Cache-Control`** if appropriate — most reads are public and benefit from short HTTP cache.
-4. **Never log untrusted strings without `sanitize()`** — log injection via CR/LF is the easiest mistake to make.
+4. **Never log untrusted strings without `sanitize()`** — log injection via CR/LF is the easiest mistake to make. Import from `apps/api/src/common/log-sanitize.ts` rather than copying the regex.
 5. **Wrap upstream calls in `undici.request` with `bodyTimeout` and `headersTimeout`**. A slow upstream must not tie up workers.
 6. **Surface upstream failure as `ServiceUnavailableException`** (503) with a generic message. Detail goes to logs, not clients.
 

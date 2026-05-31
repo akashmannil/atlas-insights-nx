@@ -8,8 +8,8 @@ atlas-insights/
 │   ├── web/      # React dashboard
 │   └── api/      # NestJS caching/security service
 ├── libs/
-│   ├── shared-types/   # wire contract (zero deps)
-│   └── shared-utils/   # CSV parser + sanitization (env-agnostic)
+│   ├── shared-types/   # wire contract (zero deps) — EarthquakeRecord, envelopes, DEFAULT_PAGE_SIZE
+│   └── shared-utils/   # CSV parser, sanitizePlace, computeEarthquakeStats (env-agnostic)
 ```
 
 ## Project boundaries (non-negotiable)
@@ -30,13 +30,18 @@ USGS CSV
 apps/api/src/earthquakes/earthquakes.service.ts
    ↓ libs/shared-utils → parseEarthquakeCsv + sanitizePlace
    ↓ @nestjs/cache-manager (5 min TTL, in-flight de-dup)
-GET /api/earthquakes  (helmet, throttle, validate)
-   ↓ fetch (apps/web/src/api/earthquakes.ts)
+GET /api/earthquakes?cursor=&limit=    (helmet, throttle, validate)
+   ↓ fetch (apps/web/src/api/earthquakes.ts) — pagination params only
    ↓ TanStack Query (apps/web/src/hooks/useEarthquakes.ts)
-   ↓ useFilteredEarthquakes (consumes Zustand filter slice)
+   ↓ useFilteredEarthquakes (consumes Zustand filter slice — client-side)
        ├→ ChartPanel → EarthquakeChart       (when activeView === 'chart')
        ├→ MapPanel   → EarthquakeMap         (when activeView === 'map')
        └→ TablePanel → EarthquakeTable
+
+GET /api/earthquakes/stats             (helmet, throttle, validate)
+   ↓ libs/shared-utils → computeEarthquakeStats
+   ↓ TanStack Query (apps/web/src/hooks/useEarthquakeStats.ts)
+   └→ StatsBar
 
 Selection / hover loops back via:
    - Zustand (selectedId, hoveredId, activeView — canonical)
@@ -47,6 +52,9 @@ panel header. Each panel reads `activeView` from Zustand independently;
 DashboardPage decides which container to render, but the selector itself
 lives next to the panel's own actions so the toggle is co-located with
 the visualisation it controls.
+
+Filter rule: record-level filters (magnitude / search / tsunami) are FE-only.
+The API surface is pagination-only — see INTERVIEWER.md §2.5.
 ```
 
 ## State layers (FE)

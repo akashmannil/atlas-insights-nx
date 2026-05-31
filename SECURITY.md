@@ -15,7 +15,7 @@ Atlas Insights is a public-data dashboard with no authenticated user surface, bu
 | Header-based attacks                | XSS, clickjacking, MIME sniffing, HSTS downgrade                        | `helmet()` with tightened CSP (no script-src — API serves no HTML), `frameAncestors 'none'`, `X-Content-Type-Options` |
 | Untrusted upstream data             | Embedded HTML / control chars in place names → XSS, log injection       | `sanitizePlace` strips control chars and tags at the **ingestion boundary**, before caching or returning      |
 | Information disclosure              | Stack traces / Express defaults leaking implementation                  | Global `HttpExceptionFilter` returns sanitized envelope; full stack only in server logs for 5xx               |
-| Log integrity                       | CR/LF injection in URLs / IPs                                           | `LoggingInterceptor` strips CR/LF and caps length before writing                                              |
+| Log integrity                       | CR/LF injection in URLs / IPs / error messages                          | Shared `sanitize()` helper (`apps/api/src/common/log-sanitize.ts`) used by both `LoggingInterceptor` and `HttpExceptionFilter` strips CR/LF and caps length before writing |
 | Reverse-proxy spoofing              | Forged `X-Forwarded-For` to bypass rate limit                           | `app.set('trust proxy', 1)` — trusts exactly one hop                                                          |
 | Secret leakage                      | `.env` committed to git or baked into a container image                 | `.gitignore` excludes `.env*.local` and `.env`; `.dockerignore` strips env files from the build context too   |
 | Supply chain                        | Compromised transitive dependencies                                     | Minimal dependency surface (10 third-party runtime deps in FE, 14 in API), all from well-maintained sources    |
@@ -43,9 +43,9 @@ Atlas Insights is a public-data dashboard with no authenticated user surface, bu
 2. `compression()` — gzip responses (defense against bandwidth amplification is not the goal; payload-size limits at the controller layer handle that).
 3. CORS allowlist — env-driven, methods restricted to `GET`, `credentials: false`.
 4. Global `ValidationPipe` — whitelisted DTO properties only.
-5. Global `ThrottlerGuard` — per-IP rate limit (default 60 req / 60 s, tightened to 30/min on `/earthquakes`).
-6. Global `LoggingInterceptor` — sanitized structured logs.
-7. Global `HttpExceptionFilter` — uniform error envelope.
+5. Global `ThrottlerGuard` — per-IP rate limit (default 60 req / 60 s, applied uniformly across `/earthquakes` and `/earthquakes/stats`).
+6. Global `LoggingInterceptor` — sanitized structured logs (CR/LF stripped via the shared `sanitize()` helper).
+7. Global `HttpExceptionFilter` — uniform error envelope; logs `method`, `url`, and any client-derived message through the same `sanitize()` helper before writing.
 
 ### 3.2 Validation
 
@@ -53,12 +53,12 @@ Atlas Insights is a public-data dashboard with no authenticated user surface, bu
 
 | Field          | Constraint                                                                       |
 | -------------- | -------------------------------------------------------------------------------- |
-| `minMagnitude` | int, 0 ≤ n ≤ 10                                                                  |
 | `limit`        | int, 1 ≤ n ≤ 10 000                                                              |
-| `search`       | string, 1–64 chars, regex `/^[\p{L}\p{N}\s,.\-']+$/u` (printable, no control chars) |
-| `tsunamiOnly`  | strict boolean                                                                   |
+| `cursor`       | int, 0 ≤ n ≤ 1 000 000                                                           |
 
 Unknown query keys → 400. Malformed values → 400. No silent coercion of garbage to defaults.
+
+Record-level filtering (`minMagnitude`, `search`, `tsunamiOnly`) is intentionally **not** part of the API surface — filtering happens client-side against the loaded slice. The DTO surface stays narrow so `forbidNonWhitelisted` rejects every unknown filter param as 400, and the ETag key doesn't depend on free-text input.
 
 ### 3.3 Sanitization
 
@@ -73,7 +73,7 @@ This is defense in depth — React already escapes text on render — but means 
 ### 3.4 Rate limiting
 
 - Default: 60 req / 60 s per IP, globally enforced by `APP_GUARD`.
-- `/api/earthquakes`: tightened to 30 req / 60 s — it's the most expensive route.
+- `/api/earthquakes` + `/api/earthquakes/stats`: inherit the global limit. No per-route override — a route-level `@Throttle` decorator that just repeats the default is dead noise and was removed.
 - `/api/health`: exempt (`@SkipThrottle()`) so probes don't compete for budget.
 - Trust-proxy is set to `1` — XFF spoofing requires breaking the reverse proxy itself.
 
@@ -90,7 +90,7 @@ The cursor pagination contract was designed with abuse-resistance in mind:
 - `cursor` is bounded (`0 ≤ n ≤ 1_000_000`) — a hostile caller can't `?cursor=Number.MAX_SAFE_INTEGER` to waste a worker on `array.slice()` past the end.
 - `limit` is bounded (`1 ≤ n ≤ 10_000`) — caps the per-request work.
 - Pagination operates on the **already-cached** parsed dataset; cache-busting query variation (e.g. random `?_=timestamp`) can't force re-parsing because the cache key is fixed.
-- Weak `ETag` derived from `(datasetVersion, query)` means re-requesting the same page returns `304` with no body — a hostile reloader can't even amplify bandwidth.
+- Weak `ETag` derived from `(datasetVersion, cursor, limit)` means re-requesting the same page returns `304` with no body — a hostile reloader can't even amplify bandwidth. The key intentionally excludes any free-text input, so cache keys can't be poisoned.
 - The dataset cache key is constant; no per-request keys are written. This rules out a "fill the cache with garbage to evict legitimate entries" attack.
 
 ### 3.7 Configuration

@@ -1,14 +1,15 @@
 import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { type ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import type { Cache } from 'cache-manager';
 import { createHash } from 'node:crypto';
 import { request } from 'undici';
-import { parseEarthquakeCsv } from '@atlas/shared-utils';
-import type {
-  EarthquakeListResponse,
-  EarthquakeRecord,
-  EarthquakeStatsResponse,
+import { computeEarthquakeStats, parseEarthquakeCsv } from '@atlas/shared-utils';
+import {
+  DEFAULT_PAGE_SIZE,
+  type EarthquakeListResponse,
+  type EarthquakeRecord,
+  type EarthquakeStatsResponse,
 } from '@atlas/shared-types';
 import type { EarthquakesQueryDto } from './dto/earthquakes-query.dto';
 
@@ -23,7 +24,7 @@ import type { EarthquakesQueryDto } from './dto/earthquakes-query.dto';
  *      and almost never re-fetches.
  *
  *   2. **ETag** — a stable hash of the dataset version + the request's
- *      filter/page params. The controller compares this to `If-None-Match`
+ *      pagination params. The controller compares this to `If-None-Match`
  *      and short-circuits with 304 when the client's copy is current. This
  *      means *zero JSON body bytes* go over the wire on a re-load until the
  *      cache TTL expires upstream.
@@ -37,8 +38,6 @@ export class EarthquakesService {
 
   private static readonly CACHE_KEY = 'earthquakes:all-month';
   private static readonly FETCH_TIMEOUT_MS = 15_000;
-  /** Default page size when `limit` is omitted but `cursor` is set. */
-  private static readonly DEFAULT_PAGE_SIZE = 500;
 
   private inflight: Promise<EarthquakeRecord[]> | null = null;
   private lastFetchAt: number | null = null;
@@ -56,19 +55,16 @@ export class EarthquakesService {
 
   async list(query: EarthquakesQueryDto): Promise<EarthquakeListResponse> {
     const { records, cached } = await this.getRecords();
-    const filtered = this.applyFilters(records, query);
-    const total = filtered.length;
+    const total = records.length;
 
     // Two pagination modes:
     //   - `cursor` set → strict pagination: slice(cursor, cursor+limit).
     //   - `cursor` omitted → legacy "limit-from-top" semantics so older
     //     clients keep working unchanged.
     const cursor = query.cursor ?? 0;
-    const pageSize = query.limit ?? (query.cursor !== undefined
-      ? EarthquakesService.DEFAULT_PAGE_SIZE
-      : total);
+    const pageSize = query.limit ?? (query.cursor !== undefined ? DEFAULT_PAGE_SIZE : total);
 
-    const sliced = filtered.slice(cursor, cursor + pageSize);
+    const sliced = records.slice(cursor, cursor + pageSize);
     const nextOffset = cursor + sliced.length;
     const nextCursor = nextOffset < total ? nextOffset : null;
 
@@ -90,7 +86,7 @@ export class EarthquakesService {
    *
    * Inputs:
    *   - `datasetVersion` — bumps on each upstream fetch, guarantees freshness.
-   *   - Query params that actually affect the response body.
+   *   - Pagination params that actually affect the response body.
    *
    * Output is a quoted weak ETag so HTTP proxies treat it correctly even if
    * gzip changes byte-for-byte equality.
@@ -98,11 +94,8 @@ export class EarthquakesService {
   computeListEtag(query: EarthquakesQueryDto): string {
     const key = JSON.stringify({
       v: this.datasetVersion,
-      minMag: query.minMagnitude ?? null,
       limit: query.limit ?? null,
       cursor: query.cursor ?? null,
-      search: query.search ?? null,
-      tsu: query.tsunamiOnly ?? null,
     });
     const hash = createHash('sha1').update(key).digest('base64url').slice(0, 16);
     return `W/"eq-${hash}"`;
@@ -110,30 +103,8 @@ export class EarthquakesService {
 
   async stats(): Promise<EarthquakeStatsResponse> {
     const { records } = await this.getRecords();
-
-    let magSum = 0;
-    let magCount = 0;
-    let maxMag: number | null = null;
-    let tsunamiCount = 0;
-    let significantCount = 0;
-    const SIGNIFICANT_THRESHOLD = 600;
-
-    for (const r of records) {
-      if (r.magnitude !== null) {
-        magSum += r.magnitude;
-        magCount += 1;
-        if (maxMag === null || r.magnitude > maxMag) maxMag = r.magnitude;
-      }
-      if (r.tsunami === 1) tsunamiCount += 1;
-      if ((r.significance ?? 0) >= SIGNIFICANT_THRESHOLD) significantCount += 1;
-    }
-
     return {
-      count: records.length,
-      averageMagnitude: magCount > 0 ? magSum / magCount : null,
-      maxMagnitude: maxMag,
-      tsunamiCount,
-      significantCount,
+      ...computeEarthquakeStats(records),
       generatedAt: Date.now(),
     };
   }
@@ -203,25 +174,5 @@ export class EarthquakesService {
       `Cached ${records.length} earthquake records (ttl ${ttlSeconds}s, version ${this.datasetVersion})`,
     );
     return records;
-  }
-
-  private applyFilters(
-    records: readonly EarthquakeRecord[],
-    query: EarthquakesQueryDto,
-  ): readonly EarthquakeRecord[] {
-    if (!query.minMagnitude && !query.search && !query.tsunamiOnly) {
-      return records;
-    }
-
-    const needle = query.search?.toLowerCase();
-    const minMag = query.minMagnitude ?? 0;
-    const tsunamiOnly = query.tsunamiOnly === true;
-
-    return records.filter((r) => {
-      if (tsunamiOnly && r.tsunami !== 1) return false;
-      if (minMag > 0 && (r.magnitude ?? -Infinity) < minMag) return false;
-      if (needle && !r.place.toLowerCase().includes(needle)) return false;
-      return true;
-    });
   }
 }
